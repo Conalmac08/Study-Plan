@@ -2,7 +2,7 @@
 
 Con's Leaving Cert 2027 planner. It's a single self-contained `index.html` that works on a phone, keeps working offline, and can sync between devices through Supabase.
 
-**Live site:** <https://conalmac08.github.io/study-plan/> (once GitHub Pages is switched on – see `CLAUDE_CODE_SETUP.md`).
+**Live site:** <https://conalmac08.github.io/Study-Plan/> (once GitHub Pages is switched on – see `CLAUDE_CODE_SETUP.md`).
 
 ## What's in this repo
 

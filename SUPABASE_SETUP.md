@@ -57,7 +57,7 @@ There are two ways to do this. Pick one.
 
 **Option A – in the app (quickest)**
 
-1. Open your site (e.g. `https://conalmac08.github.io/study-plan/`).
+1. Open your site (e.g. `https://conalmac08.github.io/Study-Plan/`).
 2. Tap the **gear icon** → **Sync between devices**.
 3. Paste the **Project URL** and the **key**, then tap **Save & connect**.
 4. The dot in the top bar turns **green** and the card says "Synced …".
