@@ -18,8 +18,8 @@
    row-level security in supabase.sql.
    ========================================================================= */
 const CONFIG = {
-  SUPABASE_URL: "",          // e.g. "https://abcdefghijkl.supabase.co"
-  SUPABASE_KEY: "",          // publishable key (sb_publishable_...) or legacy anon key
+  SUPABASE_URL: "https://rxqcpfwydwzrqocwlxsr.supabase.co",          // e.g. "https://abcdefghijkl.supabase.co"
+  SUPABASE_KEY: "sb_publishable_mk8T5lxfiDEqM1i1wwidcA_nbzlQ-oH",          // publishable key (sb_publishable_...) or legacy anon key
   SUPABASE_CDN: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
   APP_VERSION: "1.1.0",
   // AI coach: the Claude SDK is loaded on demand from a CDN (the API key is entered in the app, never here)
@@ -3046,9 +3046,9 @@ function effectiveDark() { const t = document.documentElement.getAttribute('data
    Sync — Supabase (supabase-js v2 from CDN), keyed by the random sync ID
    ========================================================================= */
 function sbConfig() {
-  if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_KEY) return { url: CONFIG.SUPABASE_URL.replace(/\/+$/, ''), key: CONFIG.SUPABASE_KEY };
+  if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_KEY) return { url: CONFIG.SUPABASE_URL.replace(/\/(rest\/v1\/?)?$/, '').replace(/\/+$/, ''), key: CONFIG.SUPABASE_KEY };
   const o = lsGet(LS.sb, null) || {};
-  return { url: o.url || '', key: o.key || '' };
+  return { url: (o.url || '').replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, ''), key: o.key || '' };
 }
 function mergeState(a, b) {
   const out = blankState();
