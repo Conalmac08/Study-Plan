@@ -54,12 +54,24 @@ There are two ways. Pick one.
 - **On each device:** open the site → ⚙ **Settings** → **Google Classroom** → paste the client ID → **Save** → **Import now**.
 - **Once for every device:** in `index.html`, find `GOOGLE_CLIENT_ID: ""` near the top, paste the ID between the quotes, then commit and push. The client ID isn't a secret, so it's fine in a public repo.
 
-## Step 6 – Import
+## Step 6 – See your Classroom posts on Today
+
+1. Open **Today**. You'll find a **Google Classroom** card.
+2. Tap **Load posts** and pick your school account. You'll probably see **"Google hasn't verified this app"**: that's expected for your own Testing-mode app, so tap **Continue**. Then allow the read-only permissions.
+3. The card shows the newest posts from all your classes: assignments, announcements and materials.
+   - New posts since you last looked get a **New** tag.
+   - Tap **Show post** to read a post, or **Open** to go to it in Classroom.
+   - **+ Plan** adds an assignment to your study plan. You say how many hours it needs.
+4. **See all** lists everything. **Refresh** checks for new posts.
+
+The card refreshes by itself every 30 minutes while you're signed in. After you close the tab, tap **Refresh** to sign in again (one tap).
+
+## Step 7 – Bulk import (optional)
 
 1. Tap **Import now** in Settings, or **Import from Classroom** on the **Dates** tab or in the **Coach**.
 2. A Google window pops up. Pick your school account.
 3. You'll probably see **"Google hasn't verified this app"**. That's expected for your own Testing-mode app: tap **Continue**.
-4. Tick the permissions (read your classes, your coursework and announcements) → **Continue**.
+4. Tick the permissions (read your classes, coursework, announcements and materials) → **Continue**.
 5. You get a list of assignments with due dates. Work you've already handed in is unticked.
 6. For each one, check the subject and set **how many hours of work** it needs. Use 0 for a reminder only.
 7. Tap **Add selected**.
@@ -83,7 +95,7 @@ You can also ask the school's IT/Google admin to allow the app. In the Google Ad
 
 ## Privacy
 
-- The app asks only for **read-only** access: your class list, *your own* coursework and submissions, and announcements.
+- The app asks only for **read-only** access: your class list, *your own* coursework and submissions, announcements and class materials.
 - Assignment titles you choose to add become tasks in your plan. They sync to your own Supabase row if you set up sync, the same as the rest of your progress.
 - Nothing from Classroom is stored anywhere else. Google sign-in tokens are kept in memory only and vanish when you close the tab.
 - To revoke access at any time, go to <https://myaccount.google.com/permissions> → **LC Study Plan** → **Remove access**.

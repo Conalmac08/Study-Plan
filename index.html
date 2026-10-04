@@ -2269,6 +2269,7 @@ function renderToday() {
   }
   const school = inSchoolToday(t, info);
   if (school.length) h += `<div class="card"><div class="card-h"><h3>In school today</h3></div><div class="list">${school.map(x => `<div class="li"><span class="dot" style="${subjStyle(x.subj)}"></span><div class="li-main"><div class="li-title">${esc(x.title)}</div><div class="li-sub">${esc(x.sub)}</div></div></div>`).join('')}</div></div>`;
+  h += gcFeedCard();
   h += dueSoonCard(t);
   h += countdownCard(t);
   h += reviewsCard(t);
@@ -2919,6 +2920,20 @@ const ACT = {
     lsSet(GC_LS, v); gcToken = null; render(); toast(v ? 'Saved – tap Import now' : 'Removed');
   },
   gcimport: () => gcImport(),
+  gcrefresh: () => gcRefresh(false),
+  gchide: () => { lsSet('lcplan.gchide', true); render(); },
+  gcseen: () => { gcFeed.seen = now(); lsSet(GCF_LS, gcFeed); render(); },
+  gcall: () => {
+    openModal(`<h2>Google Classroom</h2><div class="list">${gcFeed.items.map(gcItemHTML).join('')}</div><div class="row wrap" style="margin-top:12px"><button class="btn ghost" data-act="mclose">Close</button></div>`);
+    gcFeed.seen = now(); lsSet(GCF_LS, gcFeed);
+  },
+  gcplan: el => {
+    const x = gcFeed.items.find(i => i.id === el.dataset.id); if (!x) return;
+    const v = prompt(`How many hours of work does "${x.title}" need? (0 = just a reminder)`, '1'); if (v == null) return;
+    addTask({ title: x.title + ' (' + x.course + ')', subject: x.subj, due: x.due, hours: parseFloat(v) || 0, notes: x.text.slice(0, 200), by: 'classroom', src: 'gc:' + x.wid });
+    if ($('#modal.show')) closeModal();
+    render(); toast('Added to your plan');
+  },
   gcadd: () => gcAddSelected(),
   gcanns: () => {
     const a = (window.__gcAnns || []).join('\n\n');
@@ -3389,7 +3404,7 @@ function renderAsk() {
    Google sign-in (Google Identity Services). Setup: GOOGLE_CLASSROOM_SETUP.md
    ========================================================================= */
 const GC_LS = 'lcplan.gclient';
-const GC_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/classroom.announcements.readonly';
+const GC_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/classroom.announcements.readonly https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly';
 const gcClientId = () => CONFIG.GOOGLE_CLIENT_ID || lsGet(GC_LS, '') || '';
 const gcConfigured = () => !!gcClientId();
 let gcToken = null, gcFound = [];
@@ -3443,6 +3458,66 @@ async function gcImport() {
   } catch (e) {
     openModal(`<h2>Google Classroom</h2><div class="notice danger">${esc(e.message || e)}</div><p class="muted" style="font-size:.88rem">If your school blocks this, the easy way: open the assignment in Classroom, copy the text, and paste it into the AI coach – it adds the deadlines for you.</p><button class="btn" data-act="mclose">Close</button>`);
   }
+}
+/* ---------- Classroom feed: everything posted to your classes, shown on Today ---------- */
+const GCF_LS = 'lcplan.gcfeed';
+let gcFeed = Object.assign({ at: 0, items: [], seen: 0 }, lsGet(GCF_LS, {}) || {}), gcBusy = false, gcLastTry = 0;
+const gcKind = { work: 'Assignment', ann: 'Announcement', mat: 'Material' };
+const gcDue = w => w.dueDate ? `${w.dueDate.year}-${pad(w.dueDate.month)}-${pad(w.dueDate.day)}` : '';
+async function gcRefresh(silent) {
+  if (gcBusy || !gcConfigured()) return;
+  if (silent && !(gcToken && gcToken.exp > now() + 60000)) return;   // never pop up a sign-in on its own
+  gcBusy = true; if (!silent) render();
+  try {
+    await gcLoadGis();
+    const token = await gcGetToken();
+    const courses = (await gcFetch('courses?studentId=me&courseStates=ACTIVE&pageSize=50', token)).courses || [];
+    const items = [];
+    await Promise.all(courses.map(async c => {
+      const subj = (GC_GUESS.find(([re]) => re.test(c.name + ' ' + (c.section || ''))) || [])[1] || '';
+      const base = { course: c.name, subj };
+      const opt = async p => { try { return await gcFetch(p, token); } catch (e) { return {}; } };
+      const [cw, an, mt, sb] = await Promise.all([
+        gcFetch(`courses/${c.id}/courseWork?pageSize=20&orderBy=updateTime%20desc`, token),
+        opt(`courses/${c.id}/announcements?pageSize=15`),
+        opt(`courses/${c.id}/courseWorkMaterials?pageSize=10`),
+        opt(`courses/${c.id}/courseWork/-/studentSubmissions?userId=me&pageSize=100`)]);
+      const handed = new Set((sb.studentSubmissions || []).filter(x => x.state === 'TURNED_IN' || x.state === 'RETURNED').map(x => x.courseWorkId));
+      (cw.courseWork || []).forEach(w => items.push(Object.assign({ id: 'w:' + w.id, wid: w.id, kind: 'work', title: w.title || 'Assignment', text: w.description || '', at: w.updateTime || w.creationTime, due: gcDue(w), link: w.alternateLink, done: handed.has(w.id) }, base)));
+      (an.announcements || []).forEach(a => items.push(Object.assign({ id: 'a:' + a.id, kind: 'ann', title: (a.text || '').split('\n')[0].slice(0, 120) || 'Announcement', text: a.text || '', at: a.updateTime || a.creationTime, link: a.alternateLink }, base)));
+      (mt.courseWorkMaterial || []).forEach(m => items.push(Object.assign({ id: 'm:' + m.id, kind: 'mat', title: m.title || 'Material', text: m.description || '', at: m.updateTime || m.creationTime, link: m.alternateLink }, base)));
+    }));
+    items.forEach(x => { x.text = String(x.text).slice(0, 1500); });
+    items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    gcFeed = { at: now(), items: items.slice(0, 80), seen: gcFeed.seen || 0, err: '' };
+    if (!gcFeed.seen) gcFeed.seen = Date.parse(items[0] && items[0].at) || 0;   // first load: nothing counts as "new"
+  } catch (e) {
+    gcFeed.err = e.message || String(e);
+    if (!silent) toast('Classroom: ' + gcFeed.err);
+  } finally { gcBusy = false; lsSet(GCF_LS, gcFeed); render(); }
+}
+const gcAdded = x => x.kind === 'work' && Object.values(state.tasks).some(t => t && !t.deleted && t.src === 'gc:' + x.wid);
+function gcItemHTML(x) {
+  const isNew = Date.parse(x.at) > (gcFeed.seen || 0);
+  const posted = x.at ? fmtD(String(x.at).slice(0, 10)) : '';
+  const extra = x.kind === 'work' ? (x.done ? ' · handed in' : x.due ? ' · due ' + fmtD(x.due) : '') : '';
+  const body = x.text && x.text !== x.title ? `<details><summary class="faint" style="font-size:.8rem;cursor:pointer">Show post</summary><div style="font-size:.86rem;white-space:pre-wrap;margin-top:4px">${esc(x.text)}</div></details>` : '';
+  const add = x.kind === 'work' && !x.done && x.due && x.due >= todayISO() ? (gcAdded(x) ? '<span class="chip">in plan</span>' : `<button class="btn small" data-act="gcplan" data-id="${esc(x.id)}">+ Plan</button>`) : '';
+  return `<div class="li"><span class="dot" style="${subjStyle(x.subj)}"></span><div class="li-main"><div class="li-title">${isNew ? '<span class="chip" style="color:var(--accent)">New</span> ' : ''}${esc(x.title)}</div><div class="li-sub">${esc(gcKind[x.kind])} · ${esc(x.course)} · ${esc(posted)}${esc(extra)}</div>${body}</div><div class="row" style="gap:4px;flex:none">${add}${x.link ? `<a class="btn small ghost" href="${esc(x.link)}" target="_blank" rel="noopener">Open</a>` : ''}</div></div>`;
+}
+function gcFeedCard() {
+  if (!gcConfigured()) {
+    if (lsGet('lcplan.gchide', false)) return '';
+    return `<div class="card"><div class="card-h"><h3>Google Classroom</h3></div><p class="muted" style="font-size:.88rem">See everything posted to your classes right here, and add assignments to your plan in one tap.</p><div class="row wrap"><button class="btn small primary" data-act="nav" data-view="settings">Connect</button><button class="btn small ghost" data-act="gchide">Hide</button></div></div>`;
+  }
+  if (gcFeed.at && now() - gcFeed.at > 30 * 60000 && now() - gcLastTry > 10 * 60000 && gcToken && gcToken.exp > now() + 60000) { gcLastTry = now(); setTimeout(() => gcRefresh(true), 0); }
+  const n = gcFeed.items.filter(x => Date.parse(x.at) > (gcFeed.seen || 0)).length;
+  const ago = gcFeed.at ? Math.round((now() - gcFeed.at) / 60000) : null;
+  let h = `<div class="card"><div class="card-h"><h3>Google Classroom${n ? ` <span class="chip" style="color:var(--accent)">${n} new</span>` : ''}</h3><button class="btn small" data-act="gcrefresh" ${gcBusy ? 'disabled' : ''}>${gcBusy ? 'Loading…' : gcFeed.at ? 'Refresh' : 'Load posts'}</button></div>`;
+  if (gcFeed.err) h += `<div class="notice danger" style="font-size:.85rem">${esc(gcFeed.err)}</div>`;
+  if (!gcFeed.items.length) h += `<p class="muted" style="font-size:.88rem">${gcFeed.at ? 'Nothing posted yet.' : 'Tap Load posts and sign in with your school Google account.'}</p>`;
+  else h += `<div class="list">${gcFeed.items.slice(0, 5).map(gcItemHTML).join('')}</div><div class="row wrap" style="margin-top:6px"><button class="btn small ghost" data-act="gcall">See all (${gcFeed.items.length})</button>${n ? '<button class="btn small ghost" data-act="gcseen">Mark all read</button>' : ''}<span class="faint" style="font-size:.78rem;margin-left:auto">${ago == null ? '' : ago < 1 ? 'just now' : ago < 60 ? ago + ' min ago' : Math.round(ago / 60) + ' h ago'}</span></div>`;
+  return h + `</div>`;
 }
 function gcAddSelected() {
   let n = 0;
