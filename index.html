@@ -21,7 +21,11 @@ const CONFIG = {
   SUPABASE_URL: "",          // e.g. "https://abcdefghijkl.supabase.co"
   SUPABASE_KEY: "",          // publishable key (sb_publishable_...) or legacy anon key
   SUPABASE_CDN: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
-  APP_VERSION: "1.0.0"
+  APP_VERSION: "1.1.0",
+  // AI coach: the Claude SDK is loaded on demand from a CDN (the API key is entered in the app, never here)
+  ANTHROPIC_SDK_URLS: ["https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm", "https://esm.sh/@anthropic-ai/sdk@0.131.0"],
+  // Google Classroom import: OAuth client ID from Google Cloud (see GOOGLE_CLASSROOM_SETUP.md). Safe to make public.
+  GOOGLE_CLIENT_ID: ""
 };
 
 /* =========================================================================
@@ -1457,7 +1461,7 @@ nav.bottom {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom);
 }
-nav.bottom .in { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); height: var(--nav-h); }
+nav.bottom .in { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(6, 1fr); height: var(--nav-h); }
 nav.bottom button {
   border: 0; background: transparent; display: grid; place-items: center; align-content: center; gap: 3px; cursor: pointer;
   color: var(--text-3); font-size: .72rem; font-weight: 600; padding: 0;
@@ -1483,6 +1487,17 @@ nav.bottom button.on { color: var(--accent); }
 code.sid { font-size: .84rem; background: var(--surface-2); padding: 6px 8px; border-radius: 8px; display: block; overflow-wrap: anywhere; user-select: all; }
 hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
 .hide { display: none !important; }
+/* ---------- AI coach ---------- */
+.chatlog { display: flex; flex-direction: column; gap: 8px; max-height: 55vh; min-height: 140px; overflow-y: auto; padding: 4px 2px 8px; overscroll-behavior: contain; }
+.bubble { max-width: 88%; padding: 9px 12px; border-radius: 14px; font-size: .92rem; line-height: 1.45; overflow-wrap: anywhere; }
+.bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; }
+.bubble.ai { align-self: flex-start; background: var(--surface-2); color: var(--text); border-bottom-left-radius: 4px; }
+.act { align-self: center; font-size: .8rem; color: var(--ok); background: var(--ok-soft); padding: 4px 10px; border-radius: 999px; text-align: center; max-width: 95%; }
+.act.err { color: var(--danger); background: var(--danger-soft); }
+.act.busy { color: var(--text-2); background: var(--surface-2); }
+.chatbox { display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }
+.chatbox textarea { flex: 1; min-height: 44px; max-height: 40vh; }
+.chatbox .btn { flex: none; }
 </style>
 </head>
 <body>
@@ -1509,6 +1524,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
   <section class="view" id="view-plan" aria-label="Plan"></section>
   <section class="view" id="view-timer" aria-label="Timer"></section>
   <section class="view" id="view-dates" aria-label="Dates and countdowns"></section>
+  <section class="view" id="view-ask" aria-label="AI coach"></section>
   <section class="view" id="view-settings" aria-label="Settings"></section>
 </main>
 
@@ -1526,6 +1542,8 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>Timer</button>
     <button type="button" data-view="dates" aria-label="Dates">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2"/></svg>Dates</button>
+    <button type="button" data-view="ask" aria-label="AI coach">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>Coach</button>
   </div>
 </nav>
 
@@ -1612,8 +1630,8 @@ const PAPER_PARTS = {
 const LS = { state: 'lcplan.state.v1', theme: 'lcplan.theme', sid: 'lcplan.syncId', sb: 'lcplan.supabase', timer: 'lcplan.timer', ui: 'lcplan.ui', onb: 'lcplan.onboarded' };
 const lsGet = (k, fb) => { try { const v = localStorage.getItem(k); return v == null ? fb : JSON.parse(v); } catch (e) { return fb; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
-const MAPS = ['topics', 'ms', 'dates', 'papers', 'logs', 'blocksDone', 'frozen', 'notes'];
-const blankState = () => ({ v: 1, updatedAt: 0, settings: null, topics: {}, ms: {}, dates: {}, papers: {}, logs: {}, blocksDone: {}, frozen: {}, notes: {} });
+const MAPS = ['topics', 'ms', 'dates', 'papers', 'logs', 'blocksDone', 'frozen', 'notes', 'tasks', 'events', 'dayHours'];
+const blankState = () => ({ v: 1, updatedAt: 0, settings: null, topics: {}, ms: {}, dates: {}, papers: {}, logs: {}, blocksDone: {}, frozen: {}, notes: {}, tasks: {}, events: {}, dayHours: {} });
 function normalise(st) {
   const b = blankState();
   if (!st || typeof st !== 'object') return b;
@@ -1754,6 +1772,12 @@ function dayInfo(iso) {
   const od = getDate('oral-day'), oral = !!od && iso === od;
   if (oral) { if (type === 'work' || type === 'off') type = 'holiday'; hours = 1; start = s.start.holiday; label = 'Irish oral day – short warm-up only'; }
   else if (!od && iso >= getDate('oral-start') && iso <= getDate('oral-end')) label += ' · Irish oral window';
+  const ov = state.dayHours[iso];
+  if (ov && !ov.deleted && ov.hours != null && type !== 'done') {
+    hours = Math.max(0, +ov.hours || 0);
+    if ((type === 'work' || type === 'off') && hours > 0) { type = 'weekend'; start = s.start.weekend; }
+    label = hours ? `${label} · ${ov.note || 'custom hours'}` : `${ov.note || 'Busy'} – no study`;
+  }
   const grind = !!(s.grind.on && wd === s.grind.day && (type === 'school' || type === 'holiday') && (!exStart || iso < exStart));
   return { iso, wd, type, hours: +hours || 0, start, label, brk, bank, oral, grind, classes: type === 'school' ? (DATA.timetable[wd] || []) : [] };
 }
@@ -1794,13 +1818,23 @@ function rateTopic(id, conf) {
    ========================================================================= */
 let SIM = null, BRK_CACHE = null;
 const ACTIVE_CACHE = new Map();
-function invalidate() { SIM = null; S_CACHE = null; BRK_CACHE = null; ACTIVE_CACHE.clear(); }
+function invalidate() { SIM = null; S_CACHE = null; BRK_CACHE = null; ACTIVE_CACHE.clear(); syncUserTasks(); }
+// Your own tasks (added by hand, by the AI coach or from Google Classroom) are planned like coursework milestones.
+function syncUserTasks() {
+  Object.keys(MS).forEach(k => { if (MS[k].user) delete MS[k]; });
+  Object.entries(state.tasks || {}).forEach(([id, t]) => {
+    if (!t || t.deleted || !isISO(t.due)) return;
+    MS['ut:' + id] = { id: 'ut:' + id, n: t.title || 'Task', start: isISO(t.start) ? t.start : (t.created || t.due), due: t.due, hours: Math.max(0, +t.hours || 0), where: 'home', subj: SUBJ[t.subj] ? t.subj : null, cw: 'user', user: true, tip: t.notes || '' };
+  });
+}
 function getSim() { if (!SIM) SIM = simulate(); return SIM; }
 function planSig() {
   const s = Object.assign({}, state.settings || {}); delete s._t; delete s.sound; delete s.notify; delete s.grades;
   const ms = {}; Object.keys(state.ms).forEach(k => { const v = state.ms[k]; ms[k] = [v.done, v.start, v.due]; });
   const dt = {}; Object.keys(state.dates).forEach(k => { const v = state.dates[k]; dt[k] = [v.date, v.start, v.end]; });
-  return JSON.stringify([CONFIG.APP_VERSION, s, dt, ms]);
+  const tk = {}; Object.keys(state.tasks).forEach(k => { const v = state.tasks[k]; tk[k] = [v.start, v.due, v.hours, v.deleted]; });
+  const dh = {}; Object.keys(state.dayHours).forEach(k => { const v = state.dayHours[k]; dh[k] = [v.hours, v.deleted]; });
+  return JSON.stringify([CONFIG.APP_VERSION, s, dt, ms, tk, dh]);
 }
 const STUDY_KINDS = new Set(['recap', 'learn', 'review', 'study', 'paper', 'oral']);
 
@@ -2158,7 +2192,7 @@ function blockTitle(b, iso) {
   const subj = SUBJ[b.subj];
   const st = iso ? bState(iso, b) : {};
   if (b.kind === 'grind') return 'Maths grind';
-  if (b.kind === 'cw') return MS[b.ms] ? MS[b.ms].n : 'Coursework';
+  if (b.kind === 'cw') return MS[b.ms] ? MS[b.ms].n : 'Task';
   if (b.kind === 'paper' && b.paper) return `${subj.name} ${b.paper.p === 'Paper' ? '' : b.paper.p + ' '}${b.paper.y}${b.subj === 'phy' && typeof b.paper.y === 'number' ? ' (old course)' : ''} · ${b.paper.part}`;
   if (b.kind === 'recap') return st.topic ? topicName(st.topic) : `Recap today's ${subj.name} class`;
   if (b.topics && b.topics.length > 1) return b.warm ? `${topicName(b.topics[0])} + warm-up: ${topicName(b.topics[1])}` : (b.kind === 'oral' ? 'Oral: ' : '') + b.topics.map(topicName).join(' + ');
@@ -2181,7 +2215,7 @@ function blockMethod(b) {
 /* =========================================================================
    Rendering
    ========================================================================= */
-const views = ['today', 'subjects', 'plan', 'timer', 'dates', 'settings'];
+const views = ['today', 'subjects', 'plan', 'timer', 'dates', 'ask', 'settings'];
 function show(view) {
   if (!views.includes(view)) view = 'today';
   ui.view = view; saveUI();
@@ -2198,6 +2232,7 @@ function render() {
   else if (v === 'plan') renderPlan();
   else if (v === 'timer') renderTimer();
   else if (v === 'dates') renderDates();
+  else if (v === 'ask') renderAsk();
   else if (v === 'settings') renderSettings();
   updateTimerPill();
 }
@@ -2234,6 +2269,7 @@ function renderToday() {
   }
   const school = inSchoolToday(t, info);
   if (school.length) h += `<div class="card"><div class="card-h"><h3>In school today</h3></div><div class="list">${school.map(x => `<div class="li"><span class="dot" style="${subjStyle(x.subj)}"></span><div class="li-main"><div class="li-title">${esc(x.title)}</div><div class="li-sub">${esc(x.sub)}</div></div></div>`).join('')}</div></div>`;
+  h += gcFeedCard();
   h += dueSoonCard(t);
   h += countdownCard(t);
   h += reviewsCard(t);
@@ -2244,7 +2280,8 @@ function renderToday() {
 function blockCard(iso, b) {
   const st = bState(iso, b), k = bKey(iso, b), subj = SUBJ[b.subj];
   const open = uiOpen.has('b:' + k);
-  let meta = `<span class="chip subj" style="${subjStyle(b.subj)}">${esc(subj ? subj.short : '')}</span><span class="chip ${b.kind === 'learn' ? 'learn' : ''}">${esc(KIND_LABEL[b.kind] || b.kind)}</span>`;
+  const kindLbl = b.kind === 'cw' && MS[b.ms] && MS[b.ms].user ? 'Task' : (KIND_LABEL[b.kind] || b.kind);
+  let meta = `${subj ? `<span class="chip subj" style="${subjStyle(b.subj)}">${esc(subj.short)}</span>` : ''}<span class="chip ${b.kind === 'learn' ? 'learn' : ''}">${esc(kindLbl)}</span>`;
   const t = b.topic && TOPIC[b.topic];
   if (t) {
     meta += `<span class="chip">${esc(t.p || '')}</span>`;
@@ -2321,8 +2358,10 @@ function dueSoonCard(t) {
     const st = msState(m.id); if (st.done || !st.due) return;
     const n = diffDays(t, st.due);
     if (m.where === 'home' && st.left > 0 && n < 0) items.push({ dt: st.due, n, title: `Overdue: ${m.n}`, subj: m.subj, sub: `${hrs(st.left * 60)} left – tick it off in Subjects when done`, over: true });
-    else if (m.where === 'home' && n >= 0 && n <= 14) items.push({ dt: st.due, n, title: m.n, subj: m.subj, sub: `Milestone · ${hrs(st.left * 60)} left` });
+    else if (m.user && n >= 0 && n <= 21) items.push({ dt: st.due, n, title: m.n, subj: m.subj, sub: st.left > 0 ? `Your task · ${hrs(st.left * 60)} left` : 'Your task' });
+    else if (m.where === 'home' && !m.user && n >= 0 && n <= 14) items.push({ dt: st.due, n, title: m.n, subj: m.subj, sub: `Milestone · ${hrs(st.left * 60)} left` });
   });
+  Object.values(state.events).forEach(e => { if (!e || e.deleted || !isISO(e.date)) return; const n = diffDays(t, e.date); if (n >= 0 && n <= 21) items.push({ dt: e.date, n, title: e.title, subj: e.subj, sub: e.note || 'Your event' }); });
   items.sort((a, b) => a.dt.localeCompare(b.dt));
   if (!items.length) return `<div class="card"><div class="card-h"><h3>Due soon</h3></div><p class="muted">Nothing due in the next three weeks.</p></div>`;
   return `<div class="card"><div class="card-h"><h3>Due soon</h3><span class="faint" style="font-size:.8rem">next 3 weeks</span></div><div class="list">${items.map(x => {
@@ -2497,8 +2536,9 @@ function weekAgg(mon) {
 function deadlinesIn(a, b) {
   const items = [];
   DATA.dates.forEach(d => { const dt = getDate(d.id); if (dt && dt >= a && dt <= b && !(d.type === 'exam' && !d.subj && d.id !== 'ex-start')) items.push({ dt, title: d.label, subj: d.subj }); });
-  Object.values(MS).forEach(m => { const st = msState(m.id); if (st.due >= a && st.due <= b && !st.done && m.where === 'home') items.push({ dt: st.due, title: 'Milestone: ' + m.n, subj: m.subj }); });
+  Object.values(MS).forEach(m => { const st = msState(m.id); if (st.due >= a && st.due <= b && !st.done && m.where === 'home') items.push({ dt: st.due, title: (m.user ? 'Task: ' : 'Milestone: ') + m.n, subj: m.subj }); });
   getBreaks().forEach(br => { if (br.start >= a && br.start <= b) items.push({ dt: br.start, title: br.name + ' starts', subj: null }); });
+  Object.values(state.events).forEach(e => { if (e && !e.deleted && isISO(e.date) && e.date >= a && e.date <= b) items.push({ dt: e.date, title: e.title, subj: e.subj }); });
   return items.sort((x, y) => x.dt.localeCompare(y.dt));
 }
 function stackBar(agg) {
@@ -2654,6 +2694,7 @@ function renderDates() {
     { k: 'other', n: 'Other' }
   ];
   let h = `<div class="stack"><div class="notice">${esc(DATA.meta.disclaimer)} Change any date below and the whole plan updates.</div>`;
+  h += yourItemsHTML(t);
   groups.forEach(g => {
     const items = DATA.dates.filter(d => d.type === g.k).map(d => ({ d, dt: getDate(d.id) })).sort((a, b) => (a.dt || '9999').localeCompare(b.dt || '9999'));
     if (!items.length) return;
@@ -2664,6 +2705,21 @@ function renderDates() {
     return `<div class="li"><div class="li-main"><div class="li-title">${esc(b.name)}</div><div class="ms-edit"><label>From <input type="date" value="${esc(b.start)}" data-chg="brk" data-id="${b.id}" data-f="start"></label><label>To <input type="date" value="${esc(b.end)}" data-chg="brk" data-id="${b.id}" data-f="end"></label></div></div><div class="count ${r.cls}">${esc(r.txt)}</div></div>`;
   }).join('')}<p class="faint" style="font-size:.8rem">Bank holidays (no school): ${DATA.bankHolidays.map(d => esc(fmtD(d, { noWd: false }))).join(', ')}.</p></div></div>`;
   $('#view-dates').innerHTML = h;
+}
+function yourItemsHTML(t) {
+  const tasks = Object.entries(state.tasks).filter(([, x]) => x && !x.deleted).sort((a, b) => (a[1].due || '').localeCompare(b[1].due || ''));
+  const evs = Object.entries(state.events).filter(([, x]) => x && !x.deleted).sort((a, b) => (a[1].date || '').localeCompare(b[1].date || ''));
+  const busy = Object.entries(state.dayHours).filter(([k, x]) => x && !x.deleted && k >= t).sort((a, b) => a[0].localeCompare(b[0]));
+  let h = `<div class="section-title">Your tasks, events & busy days</div><div class="card">`;
+  h += `<div class="row wrap" style="margin-bottom:6px"><button class="btn small" data-act="taskadd">+ Task</button><button class="btn small" data-act="evadd">+ Event</button><button class="btn small" data-act="nav" data-view="ask">Ask the AI coach</button>${gcConfigured() ? '<button class="btn small" data-act="gcimport">Import from Classroom</button>' : ''}</div>`;
+  if (!tasks.length && !evs.length && !busy.length) h += `<p class="muted" style="font-size:.88rem">Nothing yet. Add tasks here, tell the AI coach (“I have an English essay due Friday”), or import from Google Classroom.</p>`;
+  tasks.forEach(([id, x]) => {
+    const st = msState('ut:' + id), r = relDays(x.due);
+    h += `<div class="li"><input type="checkbox" class="check" data-chg="msdone" data-id="ut:${esc(id)}" ${st.done ? 'checked' : ''} aria-label="Done"><div class="li-main"><div class="li-title">${subjChip(x.subj)} ${esc(x.title)}</div><div class="li-sub">Due ${esc(fmtD(x.due))}${+x.hours ? ' · ' + hrs(st.left * 60) + ' left' : ' · reminder'}${x.src ? ' · from Classroom' : x.by === 'ai' ? ' · added by AI' : ''}${x.notes ? ' · ' + esc(x.notes) : ''}</div></div><div class="count ${st.done ? 'past' : r.cls}">${esc(st.done ? 'done' : r.txt)}</div><button class="btn small ghost" data-act="taskdel" data-id="${esc(id)}" aria-label="Delete task">✕</button></div>`;
+  });
+  evs.forEach(([id, x]) => { const r = relDays(x.date); h += `<div class="li"><span class="dot" style="${subjStyle(x.subj)}"></span><div class="li-main"><div class="li-title">${esc(x.title)}</div><div class="li-sub">${esc(fmtD(x.date))}${x.note ? ' · ' + esc(x.note) : ''}</div></div><div class="count ${r.cls}">${esc(r.txt)}</div><button class="btn small ghost" data-act="evdel" data-id="${esc(id)}" aria-label="Delete event">✕</button></div>`; });
+  busy.forEach(([k, x]) => { h += `<div class="li"><span class="dot" style="--c:var(--text-3)"></span><div class="li-main"><div class="li-title">${esc(fmtD(k))}: ${x.hours ? hrs(x.hours * 60) + ' of study' : 'no study'}</div><div class="li-sub">${esc(x.note || 'Custom availability')}</div></div><button class="btn small ghost" data-act="dhdel" data-id="${esc(k)}" aria-label="Remove">✕</button></div>`; });
+  return h + `</div>`;
 }
 function dateRow(d, dt) {
   const r = relDays(dt), changed = state.dates[d.id] && (state.dates[d.id].date || '') !== (d.date || '');
@@ -2715,6 +2771,10 @@ function renderSettings() {
     <label class="field" style="margin-top:6px"><span>Publishable / anon key</span><input type="text" id="sbKey" placeholder="sb_publishable_… or eyJ…" value="${esc(sb.key)}" autocomplete="off" spellcheck="false"></label>
     <div class="row" style="margin-top:6px"><button class="btn small primary" data-act="sbsave">Save & connect</button>${sb.url ? '<button class="btn small ghost" data-act="sbclear">Disconnect</button>' : ''}</div>`}
   </div>
+  <div class="card"><div class="card-h"><h2>Google Classroom</h2></div>
+    <p class="muted" style="font-size:.88rem">Import assignments with due dates straight into your plan (read-only). Needs a free Google OAuth client ID – steps in <b>GOOGLE_CLASSROOM_SETUP.md</b> in the GitHub repo. If your school blocks it, paste Classroom posts into the AI coach instead.</p>
+    ${CONFIG.GOOGLE_CLIENT_ID ? '<p class="faint" style="font-size:.85rem">Client ID is set in index.html.</p>' : `<label class="field"><span>OAuth client ID</span><input type="text" id="gcId" placeholder="1234…apps.googleusercontent.com" value="${esc(lsGet(GC_LS, '') || '')}" autocomplete="off" spellcheck="false"></label>`}
+    <div class="row wrap" style="margin-top:6px">${CONFIG.GOOGLE_CLIENT_ID ? '' : '<button class="btn small" data-act="gcsave">Save</button>'}${gcConfigured() ? '<button class="btn small primary" data-act="gcimport">Import now</button>' : ''}</div></div>
   <div class="card"><div class="card-h"><h2>Backup</h2></div><p class="muted" style="font-size:.88rem">Download everything as a JSON file, or restore one. Importing merges with what's here (the newest change wins).</p>
     <div class="row wrap"><button class="btn" data-act="export">Export JSON</button><label class="btn" style="cursor:pointer">Import JSON<input type="file" accept="application/json,.json" data-chg="import" class="hide"></label></div></div>
   <div class="card"><div class="card-h"><h2>Appearance</h2></div><div class="seg"><button class="${!lsGet(LS.theme, '') ? 'on' : ''}" data-act="theme" data-v="">Auto</button><button class="${lsGet(LS.theme, '') === 'light' ? 'on' : ''}" data-act="theme" data-v="light">Light</button><button class="${lsGet(LS.theme, '') === 'dark' ? 'on' : ''}" data-act="theme" data-v="dark">Dark</button></div></div>
@@ -2811,9 +2871,81 @@ const ACT = {
     state = blankState(); lsSet(LS.state, state); lsSet(LS.sid, newSyncId()); lsSet(LS.ui, {}); Sync.reset(); invalidate(); location.reload();
   },
   mclose: () => closeModal(),
+  aikey: () => {
+    const k = ($('#aiKey').value || '').trim();
+    if (!/^sk-ant-[\w-]{20,}$/.test(k)) { toast('That doesn\'t look like an Anthropic API key (starts sk-ant-).'); return; }
+    lsSet(AI_LS, Object.assign(aiCfg(), { key: k })); renderAsk(); toast('Key saved on this device');
+  },
+  aikeydel: () => { if (!confirm('Remove your API key from this device?')) return; lsSet(AI_LS, Object.assign(aiCfg(), { key: '' })); renderAsk(); },
+  aisend: () => { const el = $('#aiIn'); const v = el ? el.value : aiDraft; if (!v.trim()) return; aiDraft = ''; aiSend(v); },
+  aiq: el => { aiDraft = ''; aiSend(el.dataset.q); },
+  ainew: () => { if (chat.log.length && !confirm('Start a new chat? The old conversation is cleared (your plan changes stay).')) return; chat.messages = []; chat.log = []; saveChat(); renderAsk(); },
+  taskadd: () => {
+    const opt = `<option value="">other</option>` + SUBJ_ORDER.map(id => `<option value="${id}">${esc(SUBJ[id].name)}</option>`).join('');
+    openModal(`<h2>Add a task</h2><p class="muted" style="font-size:.88rem">Homework, an essay, revising for a class test… The planner fits the hours in before the due date. 0 hours = just a reminder.</p>
+      <div class="stack" style="gap:8px"><label class="field"><span>What</span><input type="text" id="tkTitle" maxlength="140" placeholder="e.g. Othello essay draft"></label>
+      <label class="field"><span>Subject</span><select id="tkSubj">${opt}</select></label>
+      <div class="row" style="gap:8px"><label class="field" style="flex:1"><span>Due</span><input type="date" id="tkDue" value="${addDays(todayISO(), 7)}"></label><label class="field" style="width:100px"><span>Hours</span><input type="number" id="tkHrs" min="0" max="40" step="0.5" value="1"></label></div>
+      <label class="field"><span>Notes (optional)</span><input type="text" id="tkNotes" maxlength="300"></label></div>
+      <div class="row wrap" style="margin-top:12px"><button class="btn primary" data-act="tasksave">Add task</button><button class="btn ghost" data-act="mclose">Cancel</button></div>`);
+    setTimeout(() => { const i = $('#tkTitle'); if (i) i.focus(); }, 50);
+  },
+  tasksave: () => {
+    try { addTask({ title: ($('#tkTitle').value || '').trim(), subject: $('#tkSubj').value, due: $('#tkDue').value, hours: parseFloat($('#tkHrs').value) || 0, notes: ($('#tkNotes').value || '').trim() }); }
+    catch (e) { toast(e.message); return; }
+    closeModal(); render(); toast('Task added – your plan has been updated');
+  },
+  taskdel: el => { if (!confirm('Delete this task?')) return; updateTask(el.dataset.id, { delete: true }); render(); },
+  evadd: () => {
+    const opt = `<option value="">other</option>` + SUBJ_ORDER.map(id => `<option value="${id}">${esc(SUBJ[id].name)}</option>`).join('');
+    openModal(`<h2>Add an event</h2><p class="muted" style="font-size:.88rem">A class test, match, trip or appointment. It gets a countdown. (To block out study time that day, use the AI coach or “Busy day” below.)</p>
+      <div class="stack" style="gap:8px"><label class="field"><span>What</span><input type="text" id="evTitle" maxlength="140" placeholder="e.g. Physics class test"></label>
+      <label class="field"><span>Subject</span><select id="evSubj">${opt}</select></label>
+      <label class="field"><span>Date</span><input type="date" id="evDate" value="${addDays(todayISO(), 7)}"></label>
+      <label class="row" style="gap:8px"><input type="checkbox" class="check" id="evBusy"> No study that day</label></div>
+      <div class="row wrap" style="margin-top:12px"><button class="btn primary" data-act="evsave">Add event</button><button class="btn ghost" data-act="mclose">Cancel</button></div>`);
+    setTimeout(() => { const i = $('#evTitle'); if (i) i.focus(); }, 50);
+  },
+  evsave: () => {
+    const title = ($('#evTitle').value || '').trim(), date = $('#evDate').value;
+    try { addEvent({ title, date, subject: $('#evSubj').value }); if ($('#evBusy').checked) setDayHours(date, 0, title); }
+    catch (e) { toast(e.message); return; }
+    closeModal(); render(); toast('Event added');
+  },
+  evdel: el => { if (!confirm('Delete this event?')) return; state.events[el.dataset.id] = { deleted: true, _t: now() }; save(); invalidate(); render(); },
+  dhdel: el => { setDayHours(el.dataset.id, null); render(); toast('Back to your normal hours'); },
+  gcsave: () => {
+    const v = ($('#gcId').value || '').trim();
+    if (v && !/\.apps\.googleusercontent\.com$/.test(v)) { toast('A client ID ends in .apps.googleusercontent.com'); return; }
+    lsSet(GC_LS, v); gcToken = null; render(); toast(v ? 'Saved – tap Import now' : 'Removed');
+  },
+  gcimport: () => gcImport(),
+  gcrefresh: () => gcRefresh(false),
+  gchide: () => { lsSet('lcplan.gchide', true); render(); },
+  gcseen: () => { gcFeed.seen = now(); lsSet(GCF_LS, gcFeed); render(); },
+  gcall: () => {
+    openModal(`<h2>Google Classroom</h2><div class="list">${gcFeed.items.map(gcItemHTML).join('')}</div><div class="row wrap" style="margin-top:12px"><button class="btn ghost" data-act="mclose">Close</button></div>`);
+    gcFeed.seen = now(); lsSet(GCF_LS, gcFeed);
+  },
+  gcplan: el => {
+    const x = gcFeed.items.find(i => i.id === el.dataset.id); if (!x) return;
+    const v = prompt(`How many hours of work does "${x.title}" need? (0 = just a reminder)`, '1'); if (v == null) return;
+    addTask({ title: x.title + ' (' + x.course + ')', subject: x.subj, due: x.due, hours: parseFloat(v) || 0, notes: x.text.slice(0, 200), by: 'classroom', src: 'gc:' + x.wid });
+    if ($('#modal.show')) closeModal();
+    render(); toast('Added to your plan');
+  },
+  gcadd: () => gcAddSelected(),
+  gcanns: () => {
+    const a = (window.__gcAnns || []).join('\n\n');
+    closeModal(); show('ask');
+    if (!aiCfg().key) { toast('Add your API key first'); return; }
+    aiSend('Here are recent announcements from my Google Classroom. Add any deadlines, tests or events you find, and tell me what you added:\n\n' + a);
+  },
   onb: el => { setSetting('workDay', el.dataset.v); lsSet(LS.onb, true); closeModal(); render(); toast('All set – change anything in Settings'); }
 };
 const CHG = {
+  aimodel: el => { lsSet(AI_LS, Object.assign(aiCfg(), { model: el.value })); toast('Model saved'); },
+  aieffort: el => { lsSet(AI_LS, Object.assign(aiCfg(), { effort: el.value })); toast('Effort saved'); },
   tdone: el => { const id = el.dataset.id, p = tp(id); setTp(id, el.checked ? { done: true, last: p.last || todayISO(), next: p.next || addDays(todayISO(), 3) } : { done: false }); refreshAfterTopic(id); },
   bdone: el => { markBlock(el.dataset.k, el.checked); render(); },
   brecap: el => {
@@ -2823,7 +2955,7 @@ const CHG = {
     else save();
     render();
   },
-  msdone: el => { const id = el.dataset.id; setMs(id, el.checked ? { done: true } : { done: false, left: msState(id).left || MS[id].hours || 1 }); render(); },
+  msdone: el => { const id = el.dataset.id; setMs(id, el.checked ? { done: true } : { done: false, left: msState(id).left || MS[id].hours || (MS[id].user ? 0 : 1) }); render(); },
   msleft: el => { const v = parseFloat(el.value); if (!isNaN(v) && v >= 0) { setMs(el.dataset.id, { left: v }); render(); } },
   msdate: el => { if (!isISO(el.value)) return; setMs(el.dataset.id, { [el.dataset.f]: el.value }); render(); },
   paper: el => { const v = state.papers[el.dataset.key] || {}; state.papers[el.dataset.key] = Object.assign({}, v, { done: el.checked, _t: now() }); save(); invalidate(); render(); },
@@ -2879,9 +3011,11 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); }
   if (e.key === 'Escape') closeModal();
+  // Enter sends in the coach on a keyboard (Shift+Enter = new line); on phones Enter is a new line and you tap Send
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.id === 'aiIn' && window.matchMedia && matchMedia('(pointer: fine)').matches) { e.preventDefault(); ACT.aisend(); }
 });
 document.addEventListener('change', e => { const el = e.target.closest('[data-chg]'); if (el && CHG[el.dataset.chg]) CHG[el.dataset.chg](el, e); });
-document.addEventListener('input', e => { const el = e.target; if (el.matches('input[type="range"][data-chg="tfocus"]')) { const v = $('#tFocusV'); if (v) v.textContent = el.value; } if (el.matches('input[type="range"][data-chg="tbreak"]')) { const v = $('#tBrkV'); if (v) v.textContent = el.value; } });
+document.addEventListener('input', e => { const el = e.target; if (el.id === 'aiIn') aiDraft = el.value; if (el.matches('input[type="range"][data-chg="tfocus"]')) { const v = $('#tFocusV'); if (v) v.textContent = el.value; } if (el.matches('input[type="range"][data-chg="tbreak"]')) { const v = $('#tBrkV'); if (v) v.textContent = el.value; } });
 document.addEventListener('toggle', e => { const d = e.target; if (d.tagName === 'DETAILS' && d.dataset.open) { d.open ? uiOpen.add(d.dataset.open) : uiOpen.delete(d.dataset.open); saveUI(); } }, true);
 $('#themeBtn').addEventListener('click', () => { lsSet(LS.theme, effectiveDark() ? 'light' : 'dark'); applyTheme(); if (ui.view === 'settings') renderSettings(); });
 $('#settingsBtn').addEventListener('click', () => show(ui.view === 'settings' ? 'today' : 'settings'));
@@ -3004,6 +3138,399 @@ function onboarding() {
   <div class="row wrap" style="margin:12px 0"><button class="btn primary" data-act="onb" data-v="sat">I work Saturdays</button><button class="btn primary" data-act="onb" data-v="sun">I work Sundays</button></div>
   <p class="muted" style="font-size:.88rem">Defaults: Mon 3.5 h · Tue 2 h + Maths grind · Wed 4.5 h (half day) · Thu 3.5 h · Fri 3 h, in ${S().block}-minute blocks. Change anything in Settings. Sync is optional – see SUPABASE_SETUP.md.</p>`);
 }
+/* =========================================================================
+   Your tasks, events and busy days (used by the AI coach, Classroom import and the Dates tab)
+   ========================================================================= */
+const subjIds = () => SUBJ_ORDER.join(', ');
+function addTask(o) {
+  if (!o || !o.title || !isISO(o.due)) throw new Error('A task needs a title and a due date (YYYY-MM-DD).');
+  const id = o.id || uid();
+  const hours = Math.max(0, Math.min(40, +o.hours || 0));
+  state.tasks[id] = { title: String(o.title).slice(0, 140), subj: SUBJ[o.subject] ? o.subject : null, due: o.due, start: isISO(o.start) && o.start <= o.due ? o.start : todayISO(), hours, notes: o.notes ? String(o.notes).slice(0, 300) : '', created: todayISO(), by: o.by || 'you', src: o.src || null, _t: now() };
+  state.ms['ut:' + id] = { left: hours, done: !!o.done, _t: now() };
+  save(); invalidate();
+  return id;
+}
+function updateTask(id, o) {
+  const t = state.tasks[id]; if (!t || t.deleted) throw new Error('No task with id ' + id);
+  const n = Object.assign({}, t, { _t: now() });
+  if (o.title) n.title = String(o.title).slice(0, 140);
+  if (isISO(o.due)) n.due = o.due;
+  if (isISO(o.start)) n.start = o.start;
+  if (o.subject !== undefined) n.subj = SUBJ[o.subject] ? o.subject : null;
+  if (o.notes !== undefined) n.notes = String(o.notes || '').slice(0, 300);
+  if (o.delete) n.deleted = true;
+  state.tasks[id] = n;
+  const ms = Object.assign({}, state.ms['ut:' + id] || {});
+  if (o.hours_left != null) { ms.left = Math.max(0, +o.hours_left || 0); if (n.hours < ms.left) n.hours = ms.left; }
+  if (o.done != null) ms.done = !!o.done;
+  ms._t = now(); state.ms['ut:' + id] = ms;
+  save(); invalidate();
+}
+function addEvent(o) {
+  if (!o || !o.title || !isISO(o.date)) throw new Error('An event needs a title and a date (YYYY-MM-DD).');
+  const id = uid();
+  state.events[id] = { title: String(o.title).slice(0, 140), date: o.date, subj: SUBJ[o.subject] ? o.subject : null, note: o.note ? String(o.note).slice(0, 200) : '', by: o.by || 'you', _t: now() };
+  save(); invalidate();
+  return id;
+}
+function setDayHours(date, hours, note) {
+  if (!isISO(date)) throw new Error('Date must be YYYY-MM-DD.');
+  state.dayHours[date] = hours == null ? { deleted: true, _t: now() } : { hours: Math.max(0, Math.min(12, +hours || 0)), note: note ? String(note).slice(0, 80) : '', _t: now() };
+  save(); invalidate();
+}
+
+/* =========================================================================
+   AI coach — Claude via the Anthropic SDK, called straight from the browser
+   with YOUR OWN API key (kept on this device only, never synced or exported).
+   ========================================================================= */
+const AI_LS = 'lcplan.ai', CHAT_LS = 'lcplan.chat';
+const AI_MODELS = [
+  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5 (best, ~3–6c a message)' },
+  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5 (cheaper, ~1–3c a message)' }
+];
+const aiCfg = () => Object.assign({ key: '', model: AI_MODELS[0].id, effort: 'medium' }, lsGet(AI_LS, {}) || {});
+const chat = Object.assign({ messages: [], log: [] }, lsGet(CHAT_LS, {}) || {});
+const saveChat = () => { if (!lsSet(CHAT_LS, chat)) { chat.messages = chat.messages.slice(-20); lsSet(CHAT_LS, chat); } };
+let aiBusy = false, aiStatus = '', aiDraft = '';
+
+const AI_SYSTEM = `You are Con's study coach inside his Leaving Certificate 2027 study-plan app. Con is a 6th-year student at Midleton CBS, Cork, sitting the Leaving Cert in June 2027.
+Subjects (app ids): eng English HL, mat Maths HL, phy Physics HL (new 2027 specification), iri Irish Ordinary Level (needs at least an O6; the oral is 40%), dcg DCG HL, geo Geography HL, tec Technology HL.
+His week: school 08:50–15:45 (Wednesday ends 13:09), gym after school, evening study blocks, a Maths grind every Tuesday, one weekend day is a work day (no study).
+
+What you do:
+- Be a thinking partner: talk through ideas, plans, essay angles, coursework decisions, worries. Be honest, concrete and brief; he is reading on a phone. Plain language, no long lectures.
+- Change his plan when he asks, using the tools. The app replans automatically after every change.
+  - Something with a deadline that needs work (homework, essay, project step, revision for a class test): add_task with a realistic hours estimate; hours 0 means a reminder only.
+  - Something that happens on a date (class test, match, trip, mock, appointment): add_event. If it also needs preparation, add a task too.
+  - Busy or free on a particular day ("I'm away Saturday", "I have 5 hours on Sunday"): set_day_hours.
+  - Built-in dates (e.g. his Irish oral day, the Geography investigation title release): set_date with an id from get_overview.
+  - Class covered a Physics topic, or he says how well he knows something: find_topics, then update_topic.
+- When he pastes text from Google Classroom, a teacher's email or a handout, pull out every deadline, test and event and add them. If a date is ambiguous (no year, "next week"), work it out from today's date given in his message and say what you assumed.
+- Check get_overview or get_plan before answering questions about his schedule; never guess what is in the plan.
+- Only say something is done if the tool result says it succeeded. After changing things, summarise in one or two lines what you changed.
+- Dates are always YYYY-MM-DD. Official SEC dates for 2027 are provisional; don't invent new official dates.
+- You can't see Google Classroom, email or the internet yourself; work from what he tells or pastes.
+- Any coursework help must leave the work his own: give feedback, questions and structure, not finished text for SEC coursework, and remind him that AI help used in coursework must be acknowledged (SEC rule).
+- If he seems stressed or overwhelmed, be kind and practical: shrink the next step. If he mentions anything about his safety or serious distress, encourage him to talk to a parent, a teacher or the school guidance counsellor, or to contact Childline (1800 66 66 66) or text 50808.`;
+
+const AI_TOOLS = [
+  { name: 'get_overview', description: "Today's date and plan, upcoming deadlines (next 30 days), his tasks, events and busy days, subject progress and grades, current settings, and the ids of built-in dates. Call this before answering schedule questions.", input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'get_plan', description: 'The planned study blocks for each day in a date range (at most 14 days).', input_schema: { type: 'object', properties: { from: { type: 'string', description: 'YYYY-MM-DD' }, to: { type: 'string', description: 'YYYY-MM-DD' } }, required: ['from', 'to'], additionalProperties: false } },
+  { name: 'add_task', description: 'Add a task with a due date. The planner schedules study/work blocks for it before the due date (hours > 0). hours 0 = reminder only.', input_schema: { type: 'object', properties: { title: { type: 'string' }, subject: { type: 'string', description: 'eng, mat, phy, iri, dcg, geo, tec, or other' }, due: { type: 'string', description: 'YYYY-MM-DD; work must be finished by the day before' }, hours: { type: 'number', description: 'Realistic hours of home work needed (0 for a reminder)' }, start: { type: 'string', description: 'Optional YYYY-MM-DD: earliest day to start' }, notes: { type: 'string' } }, required: ['title', 'subject', 'due', 'hours'], additionalProperties: false } },
+  { name: 'update_task', description: 'Change, complete or delete one of his tasks (ids come from get_overview).', input_schema: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, due: { type: 'string' }, start: { type: 'string' }, hours_left: { type: 'number' }, done: { type: 'boolean' }, delete: { type: 'boolean' }, notes: { type: 'string' } }, required: ['id'], additionalProperties: false } },
+  { name: 'add_event', description: 'Add a dated event with a countdown (class test, match, trip, mock exam, appointment). Does not create study blocks on its own.', input_schema: { type: 'object', properties: { title: { type: 'string' }, date: { type: 'string', description: 'YYYY-MM-DD' }, subject: { type: 'string', description: 'subject id or other' }, note: { type: 'string' } }, required: ['title', 'date', 'subject'], additionalProperties: false } },
+  { name: 'delete_event', description: 'Delete one of his events (ids from get_overview).', input_schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false } },
+  { name: 'set_day_hours', description: 'Override how many study hours he has on one date (0 = busy, no study). Pass reset true to go back to normal.', input_schema: { type: 'object', properties: { date: { type: 'string', description: 'YYYY-MM-DD' }, hours: { type: 'number' }, note: { type: 'string', description: 'Short reason, e.g. "Away at match"' }, reset: { type: 'boolean' } }, required: ['date'], additionalProperties: false } },
+  { name: 'set_date', description: 'Set one of the built-in dates (deadline, oral day, exam date) by id, from get_overview.', input_schema: { type: 'object', properties: { id: { type: 'string' }, date: { type: 'string', description: 'YYYY-MM-DD, or empty string for TBC' } }, required: ['id', 'date'], additionalProperties: false } },
+  { name: 'find_topics', description: 'Search the syllabus topics (name, subject, id, confidence, next review).', input_schema: { type: 'object', properties: { query: { type: 'string' }, subject: { type: 'string' } }, required: ['query'], additionalProperties: false } },
+  { name: 'update_topic', description: 'Mark a topic as taught in class, or record how confident he is (1 shaky, 2 OK, 3 solid), which sets its next review date.', input_schema: { type: 'object', properties: { id: { type: 'string' }, taught: { type: 'boolean' }, confidence: { type: 'integer', enum: [1, 2, 3] } }, required: ['id'], additionalProperties: false } }
+];
+
+AI_TOOLS.forEach(t => { t.eager_input_streaming = true; });
+// tool inputs stream in eagerly, so check each one against its schema before running it
+function aiCheckInput(name, inp) {
+  const t = AI_TOOLS.find(x => x.name === name); if (!t) return 'unknown tool';
+  if (!inp || typeof inp !== 'object' || Array.isArray(inp)) return 'input must be an object';
+  const sc = t.input_schema, props = sc.properties || {};
+  for (const r of sc.required || []) if (inp[r] == null) return 'missing ' + r;
+  for (const [k, v] of Object.entries(inp)) {
+    const p = props[k]; if (!p) return 'unexpected field ' + k;
+    const ok = p.type === 'integer' ? Number.isInteger(v) : p.type === 'number' ? typeof v === 'number' && isFinite(v) : typeof v === p.type;
+    if (!ok) return k + ' should be ' + p.type;
+    if (p.enum && !p.enum.includes(v)) return k + ' must be one of ' + p.enum.join(', ');
+  }
+  return '';
+}
+function aiOverview() {
+  const t = todayISO(), dp = dayPlan(t), s = S();
+  const dl = deadlinesIn(t, addDays(t, 30)).map(x => ({ date: x.dt, what: x.title, subject: x.subj }));
+  return {
+    today: t, weekday: DAYNAME[wdOf(t)], day_type: dp.info.label, phase: phaseFor(t).name,
+    today_blocks: (dp.blocks || []).map(b => ({ time: hm(b.start), mins: b.mins, subject: b.subj, what: blockTitle(b, t), done: !!bState(t, b).done })),
+    deadlines_next_30_days: dl,
+    tasks: Object.entries(state.tasks).filter(([, x]) => x && !x.deleted).map(([id, x]) => { const st = msState('ut:' + id); return { id, title: x.title, subject: x.subj, due: x.due, hours_left: st.left, done: st.done }; }),
+    events: Object.entries(state.events).filter(([, x]) => x && !x.deleted).map(([id, x]) => ({ id, title: x.title, date: x.date, subject: x.subj })),
+    busy_days: Object.entries(state.dayHours).filter(([k, x]) => x && !x.deleted && k >= t).map(([k, x]) => ({ date: k, hours: x.hours, note: x.note })),
+    subjects: SUBJ_ORDER.map(id => { const p = subjProgress(id), g = grades(id); return { id, name: SUBJ[id].name, level: SUBJ[id].level, now: g.cur, target: g.tgt, topics_ticked: `${p.done}/${p.total}`, reviews_due: p.due }; }),
+    settings: { work_day: s.workDay, hours: s.hours, block_minutes: s.block, geography_elective: s.geoElective || 'not set', geography_option: s.geoOption || 'not set' },
+    built_in_dates: DATA.dates.map(d => ({ id: d.id, label: d.label, date: getDate(d.id) || 'TBC' }))
+  };
+}
+function aiRunTool(name, inp) {
+  inp = inp || {};
+  switch (name) {
+    case 'get_overview': return aiOverview();
+    case 'get_plan': {
+      if (!isISO(inp.from) || !isISO(inp.to)) throw new Error('from/to must be YYYY-MM-DD');
+      const out = []; let d = inp.from, n = 0;
+      while (d <= inp.to && n < 14) { const dp = dayPlan(d); out.push({ date: d, weekday: DAYNAME[wdOf(d)], day: dp.info.label, blocks: (dp.blocks || []).map(b => `${hm(b.start)} ${b.mins}m ${SUBJ[b.subj] ? SUBJ[b.subj].short : ''} ${blockTitle(b, d <= todayISO() ? d : null)}`) }); d = addDays(d, 1); n++; }
+      return out;
+    }
+    case 'add_task': { const id = addTask(Object.assign({}, inp, { by: 'ai' })); return { ok: true, id, note: inp.hours > 0 ? 'Scheduled into his plan before the due date.' : 'Added as a reminder.' }; }
+    case 'update_task': updateTask(inp.id, inp); return { ok: true };
+    case 'add_event': return { ok: true, id: addEvent(Object.assign({}, inp, { by: 'ai' })) };
+    case 'delete_event': { if (!state.events[inp.id]) throw new Error('No event with that id'); state.events[inp.id] = { deleted: true, _t: now() }; save(); invalidate(); return { ok: true }; }
+    case 'set_day_hours': setDayHours(inp.date, inp.reset ? null : inp.hours, inp.note); return { ok: true, day: dayInfo(inp.date).label };
+    case 'set_date': { if (!DATE[inp.id]) throw new Error('Unknown date id'); if (inp.date && !isISO(inp.date)) throw new Error('Date must be YYYY-MM-DD'); setDate(inp.id, inp.date || ''); return { ok: true }; }
+    case 'find_topics': {
+      const q = String(inp.query || '').toLowerCase().split(/\s+/).filter(Boolean);
+      const res = Object.values(TOPIC).filter(t => (!inp.subject || t.subj === inp.subject) && q.every(w => (topicName(t.id) + ' ' + t.subName + ' ' + t.catName).toLowerCase().includes(w))).slice(0, 15);
+      return res.map(t => { const p = tp(t.id); return { id: t.id, subject: t.subj, name: topicName(t.id), section: t.subName, learn_topic: t.t === 'learn', taught: !!p.taught, confidence: p.conf || null, next_review: p.next || null }; });
+    }
+    case 'update_topic': {
+      if (!TOPIC[inp.id]) throw new Error('Unknown topic id – use find_topics');
+      if (inp.taught) setTp(inp.id, { taught: true, done: true, next: tp(inp.id).next || addDays(todayISO(), 1) });
+      if (inp.confidence) rateTopic(inp.id, inp.confidence);
+      return { ok: true, next_review: tp(inp.id).next || null };
+    }
+  }
+  throw new Error('Unknown tool ' + name);
+}
+const AI_ACTION_LABEL = { add_task: i => `Added task: ${i.title} (due ${fmtD(i.due)}${i.hours ? ', ' + i.hours + ' h' : ''})`, update_task: i => i.delete ? 'Deleted a task' : i.done ? 'Marked a task done' : 'Updated a task', add_event: i => `Added event: ${i.title} (${fmtD(i.date)})`, delete_event: () => 'Deleted an event', set_day_hours: i => i.reset ? `${fmtD(i.date)} back to normal` : `${fmtD(i.date)}: ${i.hours ? i.hours + ' h of study' : 'no study'}`, set_date: i => `Set ${DATE[i.id] ? DATE[i.id].label : i.id} → ${i.date ? fmtD(i.date) : 'TBC'}`, update_topic: i => `${TOPIC[i.id] ? topicName(i.id) : i.id}: ${i.taught ? 'taught' : ''}${i.confidence ? ' rated ' + i.confidence : ''}` };
+
+let SDK = null;
+async function loadSdk() {
+  if (SDK) return SDK;
+  let last;
+  for (const u of CONFIG.ANTHROPIC_SDK_URLS) {
+    try { const m = await import(u); SDK = m.default || m.Anthropic; if (SDK) return SDK; } catch (e) { last = e; }
+  }
+  throw new Error('Could not load the Claude SDK – check your internet connection. ' + (last && last.message ? '(' + last.message + ')' : ''));
+}
+async function aiSend(text) {
+  const cfg = aiCfg();
+  if (!cfg.key) { toast('Add your Anthropic API key first'); return; }
+  text = String(text || '').trim(); if (!text || aiBusy) return;
+  aiBusy = true; aiStatus = 'Thinking…';
+  const stamp = new Date();
+  chat.messages.push({ role: 'user', content: `[Today is ${fmtLong(todayISO())} ${todayISO()}, ${pad(stamp.getHours())}:${pad(stamp.getMinutes())}]\n${text}` });
+  chat.log.push({ who: 'me', text, at: now() });
+  saveChat(); renderAsk();
+  try {
+    const Anthropic = await loadSdk();
+    const client = new Anthropic({ apiKey: cfg.key, dangerouslyAllowBrowser: true, maxRetries: 2 });
+    for (let turn = 0; turn < 10; turn++) {
+      const resp = await client.beta.messages.stream({
+        model: cfg.model,
+        max_tokens: 16000,
+        system: AI_SYSTEM,
+        tools: AI_TOOLS,
+        messages: chat.messages,
+        output_config: { effort: cfg.effort || 'medium' },
+        cache_control: { type: 'ephemeral' },
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default'
+      }).finalMessage();
+      chat.messages.push({ role: 'assistant', content: resp.content });     // keep every block unchanged (append-only history)
+      const said = resp.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+      if (said) chat.log.push({ who: 'ai', text: said, at: now() });
+      if (resp.stop_reason === 'refusal') { chat.log.push({ who: 'sys', text: "The coach couldn't help with that one. Try rephrasing, or start a new chat.", at: now() }); break; }
+      if (resp.stop_reason === 'pause_turn') { saveChat(); continue; }
+      const uses = resp.content.filter(b => b.type === 'tool_use');
+      if (resp.stop_reason !== 'tool_use' || !uses.length) {
+        if (resp.stop_reason === 'max_tokens') chat.log.push({ who: 'sys', text: 'That reply was cut short – ask it to continue.', at: now() });
+        break;
+      }
+      const results = [];
+      for (const u of uses) {
+        aiStatus = 'Updating your plan…'; renderAsk();
+        try {
+          const bad = aiCheckInput(u.name, u.input);
+          if (bad) throw new Error('Invalid input: ' + bad);
+          const out = aiRunTool(u.name, u.input);
+          results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out) });
+          if (AI_ACTION_LABEL[u.name]) chat.log.push({ who: 'act', text: AI_ACTION_LABEL[u.name](u.input || {}), at: now() });
+        } catch (e) {
+          results.push({ type: 'tool_result', tool_use_id: u.id, content: 'Error: ' + (e.message || e), is_error: true });
+        }
+      }
+      chat.messages.push({ role: 'user', content: results });
+      saveChat(); renderAsk();
+    }
+  } catch (e) {
+    let msg = e && e.message ? e.message : String(e);
+    if (SDK && e instanceof SDK.AuthenticationError) msg = 'Your API key was rejected – check it in the box below.';
+    else if (SDK && e instanceof SDK.PermissionDeniedError) msg = 'Your Anthropic account is not allowed to use this model (check billing/credits).';
+    else if (SDK && e instanceof SDK.RateLimitError) msg = 'Too many requests or out of credit – wait a minute, or top up at console.anthropic.com.';
+    else if (SDK && e instanceof SDK.APIConnectionError) msg = 'No connection to Claude – are you offline?';
+    else if (SDK && e instanceof SDK.BadRequestError) msg = 'Claude rejected the request: ' + msg + ' (starting a new chat usually fixes this).';
+    // keep history valid: drop a dangling user message that never got an answer
+    const last = chat.messages[chat.messages.length - 1];
+    if (last && last.role === 'user' && typeof last.content === 'string') chat.messages.pop();
+    chat.log.push({ who: 'sys', text: msg, at: now() });
+  } finally {
+    aiBusy = false; aiStatus = ''; saveChat(); renderAsk(); renderHeader();
+  }
+}
+function mdLite(t) {
+  return esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|\n)[-•] (.+)/g, '$1• $2').replace(/\n/g, '<br>');
+}
+function renderAsk() {
+  const el = $('#view-ask'); if (!el || ui.view !== 'ask') return;
+  const cfg = aiCfg();
+  let h = `<div class="stack">`;
+  if (!cfg.key) {
+    h += `<div class="card"><div class="card-h"><h2>AI study coach</h2></div>
+      <p style="font-size:.9rem">Bounce ideas off it, ask it to plan your week, paste in a Google Classroom post and let it add the deadlines, or just say “I'm busy Saturday” or “I have a Physics test on the 14th”. It changes your plan directly.</p>
+      <p class="muted" style="font-size:.85rem">It runs on Claude using <b>your own Anthropic API key</b>, which stays on this device only (never synced, never in backups). Pay-as-you-go: roughly 1–6 cent per message. Set a monthly spend limit in the Anthropic Console. Anthropic accounts are for people aged 18+, so if you're under 18 ask a parent to set it up.</p>
+      <ol style="font-size:.88rem;padding-left:18px"><li>Go to <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> → sign up → Billing: add a few euro of credit and set a spend limit.</li><li>API keys → Create key → copy it.</li><li>Paste it here.</li></ol>
+      <label class="field"><span>Anthropic API key</span><input type="text" id="aiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
+      <div class="row" style="margin-top:8px"><button class="btn primary" data-act="aikey">Save key</button></div></div>`;
+  } else {
+    h += `<div class="card"><div class="card-h"><h2>AI study coach</h2><button class="btn small ghost" data-act="ainew">New chat</button></div><div id="chatLog" class="chatlog">`;
+    if (!chat.log.length) h += `<div class="bubble ai">Hi Con! Ask me anything – plan tonight, talk through an essay idea, or paste a Classroom post and I'll add the deadlines. Try: <i>“I have a Maths test on Friday on differentiation”</i> or <i>“I'm away all day Sunday”</i>.</div>`;
+    chat.log.slice(-80).forEach(m => {
+      if (m.who === 'act') h += `<div class="act">✓ ${esc(m.text)}</div>`;
+      else if (m.who === 'sys') h += `<div class="act err">${esc(m.text)}</div>`;
+      else h += `<div class="bubble ${m.who === 'me' ? 'me' : 'ai'}">${m.who === 'me' ? esc(m.text).replace(/\n/g, '<br>') : mdLite(m.text)}</div>`;
+    });
+    if (aiBusy) h += `<div class="act busy">${esc(aiStatus || 'Thinking…')}</div>`;
+    h += `</div><div class="chatbox"><textarea id="aiIn" rows="2" placeholder="Message your coach… (you can paste Classroom posts)" aria-label="Message" ${aiBusy ? 'disabled' : ''}>${esc(aiDraft)}</textarea><button class="btn primary" data-act="aisend" ${aiBusy ? 'disabled' : ''}>Send</button></div>
+      <div class="row wrap" style="margin-top:8px">${['Plan my evening', 'What\'s due this week?', 'I\'m busy this Saturday', 'Help me plan my Othello essay'].map(q => `<button class="btn small" data-act="aiq" data-q="${esc(q)}" ${aiBusy ? 'disabled' : ''}>${esc(q)}</button>`).join('')}${gcConfigured() ? '<button class="btn small" data-act="gcimport">Import from Classroom</button>' : ''}</div></div>
+      <details class="cat"><summary><span class="chev">›</span>Coach settings</summary><div class="cat-body">
+        <label class="field"><span>Model</span><select data-chg="aimodel">${AI_MODELS.map(m => `<option value="${m.id}" ${cfg.model === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
+        <label class="field" style="margin-top:6px"><span>Effort</span><select data-chg="aieffort">${['low', 'medium', 'high'].map(e => `<option ${cfg.effort === e ? 'selected' : ''}>${e}</option>`).join('')}</select></label>
+        <p class="faint" style="font-size:.8rem">Long chats cost more per message (the whole chat is re-sent) – start a new chat for new topics. Your key: ${esc(cfg.key.slice(0, 10))}…</p>
+        <button class="btn small danger" data-act="aikeydel">Remove key from this device</button></div></details>`;
+  }
+  h += `</div>`;
+  el.innerHTML = h;
+  const log = $('#chatLog'); if (log) log.scrollTop = log.scrollHeight;
+}
+
+/* =========================================================================
+   Google Classroom import — read-only, runs in your browser with your own
+   Google sign-in (Google Identity Services). Setup: GOOGLE_CLASSROOM_SETUP.md
+   ========================================================================= */
+const GC_LS = 'lcplan.gclient';
+const GC_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/classroom.announcements.readonly https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly';
+const gcClientId = () => CONFIG.GOOGLE_CLIENT_ID || lsGet(GC_LS, '') || '';
+const gcConfigured = () => !!gcClientId();
+let gcToken = null, gcFound = [];
+const GC_GUESS = [[/english/i, 'eng'], [/math/i, 'mat'], [/physic/i, 'phy'], [/irish|gaeilge/i, 'iri'], [/dcg|design|graphic/i, 'dcg'], [/geog/i, 'geo'], [/tech/i, 'tec']];
+function gcLoadGis() {
+  if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = () => res(); sc.onerror = () => rej(new Error('Could not load Google sign-in (offline?)')); document.head.appendChild(sc); });
+}
+function gcGetToken() {
+  return new Promise((res, rej) => {
+    if (gcToken && gcToken.exp > now() + 60000) return res(gcToken.t);
+    const tc = google.accounts.oauth2.initTokenClient({ client_id: gcClientId(), scope: GC_SCOPES, callback: r => { if (r.error) return rej(new Error(r.error_description || r.error)); gcToken = { t: r.access_token, exp: now() + (+r.expires_in || 3000) * 1000 }; res(gcToken.t); }, error_callback: e => rej(new Error((e && e.message) || (e && e.type) || 'Sign-in cancelled')) });
+    tc.requestAccessToken();
+  });
+}
+async function gcFetch(path, token) {
+  const r = await fetch('https://classroom.googleapis.com/v1/' + path, { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) { let m = r.status + ''; try { const j = await r.json(); m = (j.error && j.error.message) || m; } catch (e) { /* keep status */ } throw new Error(r.status === 403 ? 'Google said no (403): ' + m + ' – your school may block third-party apps; see GOOGLE_CLASSROOM_SETUP.md.' : m); }
+  return r.json();
+}
+async function gcImport() {
+  if (!gcConfigured()) { show('settings'); toast('Add your Google OAuth client ID first (Settings → Google Classroom)'); return; }
+  openModal(`<h2>Google Classroom</h2><p class="muted">Signing in and reading your classes…</p>`);
+  try {
+    await gcLoadGis();
+    const token = await gcGetToken();
+    const courses = (await gcFetch('courses?studentId=me&courseStates=ACTIVE&pageSize=50', token)).courses || [];
+    const t = todayISO(), found = [], anns = [];
+    for (const c of courses) {
+      const subj = (GC_GUESS.find(([re]) => re.test(c.name + ' ' + (c.section || ''))) || [])[1] || '';
+      const work = (await gcFetch(`courses/${c.id}/courseWork?pageSize=40&orderBy=updateTime%20desc`, token)).courseWork || [];
+      let subs = []; try { subs = (await gcFetch(`courses/${c.id}/courseWork/-/studentSubmissions?userId=me&pageSize=100`, token)).studentSubmissions || []; } catch (e) { /* optional */ }
+      const turnedIn = new Set(subs.filter(x => x.state === 'TURNED_IN' || x.state === 'RETURNED').map(x => x.courseWorkId));
+      work.forEach(w => {
+        if (!w.dueDate) return;
+        const due = `${w.dueDate.year}-${pad(w.dueDate.month)}-${pad(w.dueDate.day)}`;
+        if (due < addDays(t, -7)) return;
+        const already = Object.values(state.tasks).some(x => x && !x.deleted && x.src === 'gc:' + w.id);
+        found.push({ id: w.id, course: c.name, subj, title: w.title, due, done: turnedIn.has(w.id), already, desc: (w.description || '').slice(0, 300) });
+      });
+      try { (await gcFetch(`courses/${c.id}/announcements?pageSize=5`, token)).announcements?.forEach(a => { if ((a.updateTime || '').slice(0, 10) >= addDays(t, -14)) anns.push(`[${c.name}] ${a.text || ''}`.slice(0, 1200)); }); } catch (e) { /* optional */ }
+    }
+    found.sort((a, b) => a.due.localeCompare(b.due));
+    gcFound = found;
+    const opt = sel => `<option value="">other</option>` + SUBJ_ORDER.map(id => `<option value="${id}" ${sel === id ? 'selected' : ''}>${esc(SUBJ[id].short)}</option>`).join('');
+    openModal(`<h2>From Google Classroom</h2>
+      <p class="muted" style="font-size:.88rem">${courses.length} classes · ${found.length} assignments with due dates. Pick what to add – each becomes a task the planner schedules before its due date.</p>
+      <div class="list">${found.map((f, i) => `<div class="li"><input type="checkbox" class="check gcpick" data-i="${i}" ${!f.done && !f.already ? 'checked' : ''}><div class="li-main"><div class="li-title">${esc(f.title)}</div><div class="li-sub">${esc(f.course)} · due ${esc(fmtD(f.due))}${f.done ? ' · handed in' : ''}${f.already ? ' · already added' : ''}</div><div class="ms-edit"><select class="gcsubj" data-i="${i}">${opt(f.subj)}</select><label>Hours <input type="number" class="gchrs" data-i="${i}" min="0" max="20" step="0.5" value="1"></label></div></div></div>`).join('') || '<p class="muted">No upcoming assignments with due dates.</p>'}</div>
+      <div class="row wrap" style="margin-top:12px"><button class="btn primary" data-act="gcadd">Add selected</button>${anns.length ? '<button class="btn" data-act="gcanns">Send recent announcements to the AI coach</button>' : ''}<button class="btn ghost" data-act="mclose">Close</button></div>`);
+    window.__gcAnns = anns;
+  } catch (e) {
+    openModal(`<h2>Google Classroom</h2><div class="notice danger">${esc(e.message || e)}</div><p class="muted" style="font-size:.88rem">If your school blocks this, the easy way: open the assignment in Classroom, copy the text, and paste it into the AI coach – it adds the deadlines for you.</p><button class="btn" data-act="mclose">Close</button>`);
+  }
+}
+/* ---------- Classroom feed: everything posted to your classes, shown on Today ---------- */
+const GCF_LS = 'lcplan.gcfeed';
+let gcFeed = Object.assign({ at: 0, items: [], seen: 0 }, lsGet(GCF_LS, {}) || {}), gcBusy = false, gcLastTry = 0;
+const gcKind = { work: 'Assignment', ann: 'Announcement', mat: 'Material' };
+const gcDue = w => w.dueDate ? `${w.dueDate.year}-${pad(w.dueDate.month)}-${pad(w.dueDate.day)}` : '';
+async function gcRefresh(silent) {
+  if (gcBusy || !gcConfigured()) return;
+  if (silent && !(gcToken && gcToken.exp > now() + 60000)) return;   // never pop up a sign-in on its own
+  gcBusy = true; if (!silent) render();
+  try {
+    await gcLoadGis();
+    const token = await gcGetToken();
+    const courses = (await gcFetch('courses?studentId=me&courseStates=ACTIVE&pageSize=50', token)).courses || [];
+    const items = [];
+    await Promise.all(courses.map(async c => {
+      const subj = (GC_GUESS.find(([re]) => re.test(c.name + ' ' + (c.section || ''))) || [])[1] || '';
+      const base = { course: c.name, subj };
+      const opt = async p => { try { return await gcFetch(p, token); } catch (e) { return {}; } };
+      const [cw, an, mt, sb] = await Promise.all([
+        gcFetch(`courses/${c.id}/courseWork?pageSize=20&orderBy=updateTime%20desc`, token),
+        opt(`courses/${c.id}/announcements?pageSize=15`),
+        opt(`courses/${c.id}/courseWorkMaterials?pageSize=10`),
+        opt(`courses/${c.id}/courseWork/-/studentSubmissions?userId=me&pageSize=100`)]);
+      const handed = new Set((sb.studentSubmissions || []).filter(x => x.state === 'TURNED_IN' || x.state === 'RETURNED').map(x => x.courseWorkId));
+      (cw.courseWork || []).forEach(w => items.push(Object.assign({ id: 'w:' + w.id, wid: w.id, kind: 'work', title: w.title || 'Assignment', text: w.description || '', at: w.updateTime || w.creationTime, due: gcDue(w), link: w.alternateLink, done: handed.has(w.id) }, base)));
+      (an.announcements || []).forEach(a => items.push(Object.assign({ id: 'a:' + a.id, kind: 'ann', title: (a.text || '').split('\n')[0].slice(0, 120) || 'Announcement', text: a.text || '', at: a.updateTime || a.creationTime, link: a.alternateLink }, base)));
+      (mt.courseWorkMaterial || []).forEach(m => items.push(Object.assign({ id: 'm:' + m.id, kind: 'mat', title: m.title || 'Material', text: m.description || '', at: m.updateTime || m.creationTime, link: m.alternateLink }, base)));
+    }));
+    items.forEach(x => { x.text = String(x.text).slice(0, 1500); });
+    items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    gcFeed = { at: now(), items: items.slice(0, 80), seen: gcFeed.seen || 0, err: '' };
+    if (!gcFeed.seen) gcFeed.seen = Date.parse(items[0] && items[0].at) || 0;   // first load: nothing counts as "new"
+  } catch (e) {
+    gcFeed.err = e.message || String(e);
+    if (!silent) toast('Classroom: ' + gcFeed.err);
+  } finally { gcBusy = false; lsSet(GCF_LS, gcFeed); render(); }
+}
+const gcAdded = x => x.kind === 'work' && Object.values(state.tasks).some(t => t && !t.deleted && t.src === 'gc:' + x.wid);
+function gcItemHTML(x) {
+  const isNew = Date.parse(x.at) > (gcFeed.seen || 0);
+  const posted = x.at ? fmtD(String(x.at).slice(0, 10)) : '';
+  const extra = x.kind === 'work' ? (x.done ? ' · handed in' : x.due ? ' · due ' + fmtD(x.due) : '') : '';
+  const body = x.text && x.text !== x.title ? `<details><summary class="faint" style="font-size:.8rem;cursor:pointer">Show post</summary><div style="font-size:.86rem;white-space:pre-wrap;margin-top:4px">${esc(x.text)}</div></details>` : '';
+  const add = x.kind === 'work' && !x.done && x.due && x.due >= todayISO() ? (gcAdded(x) ? '<span class="chip">in plan</span>' : `<button class="btn small" data-act="gcplan" data-id="${esc(x.id)}">+ Plan</button>`) : '';
+  return `<div class="li"><span class="dot" style="${subjStyle(x.subj)}"></span><div class="li-main"><div class="li-title">${isNew ? '<span class="chip" style="color:var(--accent)">New</span> ' : ''}${esc(x.title)}</div><div class="li-sub">${esc(gcKind[x.kind])} · ${esc(x.course)} · ${esc(posted)}${esc(extra)}</div>${body}</div><div class="row" style="gap:4px;flex:none">${add}${x.link ? `<a class="btn small ghost" href="${esc(x.link)}" target="_blank" rel="noopener">Open</a>` : ''}</div></div>`;
+}
+function gcFeedCard() {
+  if (!gcConfigured()) {
+    if (lsGet('lcplan.gchide', false)) return '';
+    return `<div class="card"><div class="card-h"><h3>Google Classroom</h3></div><p class="muted" style="font-size:.88rem">See everything posted to your classes right here, and add assignments to your plan in one tap.</p><div class="row wrap"><button class="btn small primary" data-act="nav" data-view="settings">Connect</button><button class="btn small ghost" data-act="gchide">Hide</button></div></div>`;
+  }
+  if (gcFeed.at && now() - gcFeed.at > 30 * 60000 && now() - gcLastTry > 10 * 60000 && gcToken && gcToken.exp > now() + 60000) { gcLastTry = now(); setTimeout(() => gcRefresh(true), 0); }
+  const n = gcFeed.items.filter(x => Date.parse(x.at) > (gcFeed.seen || 0)).length;
+  const ago = gcFeed.at ? Math.round((now() - gcFeed.at) / 60000) : null;
+  let h = `<div class="card"><div class="card-h"><h3>Google Classroom${n ? ` <span class="chip" style="color:var(--accent)">${n} new</span>` : ''}</h3><button class="btn small" data-act="gcrefresh" ${gcBusy ? 'disabled' : ''}>${gcBusy ? 'Loading…' : gcFeed.at ? 'Refresh' : 'Load posts'}</button></div>`;
+  if (gcFeed.err) h += `<div class="notice danger" style="font-size:.85rem">${esc(gcFeed.err)}</div>`;
+  if (!gcFeed.items.length) h += `<p class="muted" style="font-size:.88rem">${gcFeed.at ? 'Nothing posted yet.' : 'Tap Load posts and sign in with your school Google account.'}</p>`;
+  else h += `<div class="list">${gcFeed.items.slice(0, 5).map(gcItemHTML).join('')}</div><div class="row wrap" style="margin-top:6px"><button class="btn small ghost" data-act="gcall">See all (${gcFeed.items.length})</button>${n ? '<button class="btn small ghost" data-act="gcseen">Mark all read</button>' : ''}<span class="faint" style="font-size:.78rem;margin-left:auto">${ago == null ? '' : ago < 1 ? 'just now' : ago < 60 ? ago + ' min ago' : Math.round(ago / 60) + ' h ago'}</span></div>`;
+  return h + `</div>`;
+}
+function gcAddSelected() {
+  let n = 0;
+  $$('.gcpick').forEach(cb => {
+    if (!cb.checked) return;
+    const i = +cb.dataset.i, f = gcFound[i]; if (!f || f.already) return;
+    const subj = ($(`.gcsubj[data-i="${i}"]`) || {}).value || '', hours = parseFloat(($(`.gchrs[data-i="${i}"]`) || {}).value) || 0;
+    addTask({ title: f.title + ' (' + f.course + ')', subject: subj, due: f.due, hours, notes: f.desc.slice(0, 200), by: 'classroom', src: 'gc:' + f.id, done: f.done });
+    n++;
+  });
+  closeModal(); render(); toast(n ? `Added ${n} Classroom task${n === 1 ? '' : 's'}` : 'Nothing added');
+}
+
 function boot() {
   applyTheme();
   if (window.matchMedia) { try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme()); } catch (e) { /* old browser */ } }
@@ -3015,7 +3542,7 @@ function boot() {
   Sync.sync(false);
   if ('serviceWorker' in navigator && location.protocol === 'https:') { navigator.serviceWorker.register('sw.js').catch(() => { /* optional sw.js not present */ }); }
 }
-window.__lcplan = { getSim, dayPlan, dayInfo, state: () => state, S, rateTopic, mergeState, Sync, TOPIC, MS };
+window.__lcplan = { getSim, dayPlan, dayInfo, state: () => state, S, rateTopic, mergeState, Sync, TOPIC, MS, aiRunTool };
 boot();
 })();
 </script>
