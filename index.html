@@ -2774,7 +2774,11 @@ function renderSettings() {
   <div class="card"><div class="card-h"><h2>Google Classroom</h2></div>
     <p class="muted" style="font-size:.88rem">Import assignments with due dates straight into your plan (read-only). Needs a free Google OAuth client ID – steps in <b>GOOGLE_CLASSROOM_SETUP.md</b> in the GitHub repo. If your school blocks it, paste Classroom posts into the AI coach instead.</p>
     ${CONFIG.GOOGLE_CLIENT_ID ? '<p class="faint" style="font-size:.85rem">Client ID is set in index.html.</p>' : `<label class="field"><span>OAuth client ID</span><input type="text" id="gcId" placeholder="1234…apps.googleusercontent.com" value="${esc(lsGet(GC_LS, '') || '')}" autocomplete="off" spellcheck="false"></label>`}
-    <div class="row wrap" style="margin-top:6px">${CONFIG.GOOGLE_CLIENT_ID ? '' : '<button class="btn small" data-act="gcsave">Save</button>'}${gcConfigured() ? '<button class="btn small primary" data-act="gcimport">Import now</button>' : ''}</div></div>
+    <div class="row wrap" style="margin-top:6px">${CONFIG.GOOGLE_CLIENT_ID ? '' : '<button class="btn small" data-act="gcsave">Save</button>'}${gcConfigured() ? '<button class="btn small primary" data-act="gcimport">Import now</button>' : ''}</div>
+    <p class="section-title">Automatic (works when your school blocks sign-in)</p>
+    <p class="muted" style="font-size:.88rem">A small script in your own Google account sends your Classroom posts here every hour – no sign-in pop-ups, no copy-paste of posts. Needs sync (Supabase) connected. Steps: <b>CLASSROOM_AUTO_SETUP.md</b> in the GitHub repo.</p>
+    ${gcFeed.src === 'script' ? `<p class="faint" style="font-size:.85rem">✓ Script working – last update ${esc(new Date(gcFeed.at).toLocaleString('en-IE', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}, ${gcFeed.items.length} posts.</p>` : ''}
+    <div class="row wrap"><button class="btn small ${gcConfigured() ? '' : 'primary'}" data-act="gccopy" ${sbConfig().url ? '' : 'disabled'}>Copy script</button>${sbConfig().url ? '' : '<span class="faint" style="font-size:.82rem">Connect sync above first</span>'}</div></div>
   <div class="card"><div class="card-h"><h2>Backup</h2></div><p class="muted" style="font-size:.88rem">Download everything as a JSON file, or restore one. Importing merges with what's here (the newest change wins).</p>
     <div class="row wrap"><button class="btn" data-act="export">Export JSON</button><label class="btn" style="cursor:pointer">Import JSON<input type="file" accept="application/json,.json" data-chg="import" class="hide"></label></div></div>
   <div class="card"><div class="card-h"><h2>Appearance</h2></div><div class="seg"><button class="${!lsGet(LS.theme, '') ? 'on' : ''}" data-act="theme" data-v="">Auto</button><button class="${lsGet(LS.theme, '') === 'light' ? 'on' : ''}" data-act="theme" data-v="light">Light</button><button class="${lsGet(LS.theme, '') === 'dark' ? 'on' : ''}" data-act="theme" data-v="dark">Dark</button></div></div>
@@ -2920,6 +2924,7 @@ const ACT = {
     lsSet(GC_LS, v); gcToken = null; render(); toast(v ? 'Saved – tap Import now' : 'Removed');
   },
   gcimport: () => gcImport(),
+  gccopy: () => gcCopyScript(),
   gcrefresh: () => gcRefresh(false),
   gchide: () => { lsSet('lcplan.gchide', true); render(); },
   gcseen: () => { gcFeed.seen = now(); lsSet(GCF_LS, gcFeed); render(); },
@@ -3071,7 +3076,7 @@ const Sync = {
     return 'Connected.';
   },
   setStatus(s, err) { this.status = s; this.err = err || ''; const d = $('#syncDot'); if (d) { d.className = 'sync-dot ' + this.dot(); d.title = this.message(); } },
-  reset() { this.client = null; this.setStatus('off'); },
+  reset() { this.client = null; this.noFeed = false; this.setStatus('off'); },
   async lib() {
     if (window.supabase && window.supabase.createClient) return window.supabase;
     if (!this.loading) this.loading = new Promise((res, rej) => {
@@ -3110,6 +3115,7 @@ const Sync = {
       }
       const push = await client.rpc('sync_push', { p_sync_id: id, p_data: state });
       if (push.error) throw push.error;
+      if (!this.noFeed) try { const fp = await client.rpc('feed_pull', { p_sync_id: id }); if (fp.error && fp.status === 404) this.noFeed = true; const fr = !fp.error && (Array.isArray(fp.data) ? fp.data[0] : fp.data); if (fr && fr.data) gcApplyScriptFeed(fr.data); } catch (e) { /* feed is optional */ }
       this.last = now(); this.setStatus('ok');
       if (manual) toast('Synced');
     } catch (e) {
@@ -3505,15 +3511,31 @@ function gcItemHTML(x) {
   const add = x.kind === 'work' && !x.done && x.due && x.due >= todayISO() ? (gcAdded(x) ? '<span class="chip">in plan</span>' : `<button class="btn small" data-act="gcplan" data-id="${esc(x.id)}">+ Plan</button>`) : '';
   return `<div class="li"><span class="dot" style="${subjStyle(x.subj)}"></span><div class="li-main"><div class="li-title">${isNew ? '<span class="chip" style="color:var(--accent)">New</span> ' : ''}${esc(x.title)}</div><div class="li-sub">${esc(gcKind[x.kind])} · ${esc(x.course)} · ${esc(posted)}${esc(extra)}</div>${body}</div><div class="row" style="gap:4px;flex:none">${add}${x.link ? `<a class="btn small ghost" href="${esc(x.link)}" target="_blank" rel="noopener">Open</a>` : ''}</div></div>`;
 }
+function gcApplyScriptFeed(d) {
+  if (!d || !Array.isArray(d.items) || !(+d.at > 0) || (gcFeed.src === 'script' && +d.at <= gcFeed.at)) return;
+  const items = d.items.filter(x => x && x.id && x.kind).map(x => Object.assign({}, x, { subj: (GC_GUESS.find(([re]) => re.test(x.course || '')) || [])[1] || '', title: String(x.title || '').slice(0, 140), text: String(x.text || '').slice(0, 1500) }));
+  gcFeed = { at: +d.at, items, seen: gcFeed.seen || Date.parse(items[0] && items[0].at) || 0, src: 'script', err: '' };
+  lsSet(GCF_LS, gcFeed);
+  if (ui.view === 'today' || ui.view === 'settings') render();
+}
+async function gcCopyScript() {
+  const c = sbConfig(); if (!c.url) { toast('Connect sync (Supabase) first'); return; }
+  let txt;
+  try { const r = await fetch('classroom-sync.gs', { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status); txt = await r.text(); }
+  catch (e) { toast('Could not load the script – are you online?'); return; }
+  txt = txt.replace('PASTE_PROJECT_URL', c.url).replace('PASTE_PUBLISHABLE_KEY', c.key).replace('PASTE_SYNC_ID', syncId());
+  try { await navigator.clipboard.writeText(txt); toast('Script copied – paste it into Apps Script'); }
+  catch (e) { openModal(`<h2>Your Classroom script</h2><p class="muted" style="font-size:.88rem">Select all and copy:</p><textarea readonly style="min-height:50vh;font-family:monospace;font-size:.75rem">${esc(txt)}</textarea><button class="btn" data-act="mclose">Close</button>`); }
+}
 function gcFeedCard() {
-  if (!gcConfigured()) {
+  if (!gcConfigured() && gcFeed.src !== 'script') {
     if (lsGet('lcplan.gchide', false)) return '';
     return `<div class="card"><div class="card-h"><h3>Google Classroom</h3></div><p class="muted" style="font-size:.88rem">See everything posted to your classes right here, and add assignments to your plan in one tap.</p><div class="row wrap"><button class="btn small primary" data-act="nav" data-view="settings">Connect</button><button class="btn small ghost" data-act="gchide">Hide</button></div></div>`;
   }
   if (gcFeed.at && now() - gcFeed.at > 30 * 60000 && now() - gcLastTry > 10 * 60000 && gcToken && gcToken.exp > now() + 60000) { gcLastTry = now(); setTimeout(() => gcRefresh(true), 0); }
   const n = gcFeed.items.filter(x => Date.parse(x.at) > (gcFeed.seen || 0)).length;
   const ago = gcFeed.at ? Math.round((now() - gcFeed.at) / 60000) : null;
-  let h = `<div class="card"><div class="card-h"><h3>Google Classroom${n ? ` <span class="chip" style="color:var(--accent)">${n} new</span>` : ''}</h3><button class="btn small" data-act="gcrefresh" ${gcBusy ? 'disabled' : ''}>${gcBusy ? 'Loading…' : gcFeed.at ? 'Refresh' : 'Load posts'}</button></div>`;
+  let h = `<div class="card"><div class="card-h"><h3>Google Classroom${n ? ` <span class="chip" style="color:var(--accent)">${n} new</span>` : ''}</h3><button class="btn small" data-act="${gcConfigured() ? 'gcrefresh' : 'syncnow'}" ${gcBusy ? 'disabled' : ''}>${gcBusy ? 'Loading…' : gcFeed.at ? 'Refresh' : 'Load posts'}</button></div>`;
   if (gcFeed.err) h += `<div class="notice danger" style="font-size:.85rem">${esc(gcFeed.err)}</div>`;
   if (!gcFeed.items.length) h += `<p class="muted" style="font-size:.88rem">${gcFeed.at ? 'Nothing posted yet.' : 'Tap Load posts and sign in with your school Google account.'}</p>`;
   else h += `<div class="list">${gcFeed.items.slice(0, 5).map(gcItemHTML).join('')}</div><div class="row wrap" style="margin-top:6px"><button class="btn small ghost" data-act="gcall">See all (${gcFeed.items.length})</button>${n ? '<button class="btn small ghost" data-act="gcseen">Mark all read</button>' : ''}<span class="faint" style="font-size:.78rem;margin-left:auto">${ago == null ? '' : ago < 1 ? 'just now' : ago < 60 ? ago + ' min ago' : Math.round(ago / 60) + ' h ago'}</span></div>`;
