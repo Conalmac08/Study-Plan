@@ -14,6 +14,7 @@ Con's Leaving Cert 2027 planner. It's a single self-contained `index.html` that 
 | `supabase.sql` | Database setup for sync: a table with row-level security plus two locked-down functions. |
 | `SUPABASE_SETUP.md` | Beginner, step-by-step guide to connecting Supabase. |
 | `GOOGLE_CLASSROOM_SETUP.md` | Optional: connect Google Classroom so assignments and due dates can be imported as tasks. |
+| `CLASSROOM_AUTO_SETUP.md` + `classroom-sync.gs` | Optional: an Apps Script that sends your Classroom posts to the app every hour. Use it if your school blocks Google sign-in. |
 | `CLAUDE_CODE_SETUP.md` | Ready-to-paste instructions for Claude Code: publish on GitHub Pages and connect Supabase. |
 | `sw.js` | Optional. Lets the site open with no internet after the first visit. The app works without it. |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are. |
@@ -53,7 +54,7 @@ Every change it makes shows as a green ✓ line in the chat, and you can see or 
 
 ## Google Classroom
 
-See `GOOGLE_CLASSROOM_SETUP.md`. Once set up, **Import from Classroom** lists your assignments with due dates, and you tick which ones to add. If your school blocks third-party sign-in, copy the assignment text and paste it into the Coach instead.
+Your Classroom posts show in a card on **Today**. There are two ways to connect it: Google sign-in (`GOOGLE_CLASSROOM_SETUP.md`), or, if your school blocks that, a script in your own Google account (`CLASSROOM_AUTO_SETUP.md`). Once set up, **Import from Classroom** lists your assignments with due dates, and you tick which ones to add. If your school blocks third-party sign-in, copy the assignment text and paste it into the Coach instead.
 
 ## Editing the course content
 

@@ -94,6 +94,59 @@ revoke all on function public.sync_push(text, jsonb) from public;
 grant execute on function public.sync_pull(text) to anon, authenticated;
 grant execute on function public.sync_push(text, jsonb) to anon, authenticated;
 
+-- 4. Google Classroom feed (optional) --------------------------------------
+-- Written by the Apps Script in classroom-sync.gs (runs in your own Google
+-- account), read by the app. Same rules: one row per sync ID, functions only.
+create table if not exists public.classroom_feed (
+  sync_id    text primary key check (char_length(sync_id) between 32 and 128),
+  data       jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.classroom_feed enable row level security;
+drop policy if exists "no direct access" on public.classroom_feed;
+create policy "no direct access" on public.classroom_feed
+  as restrictive for all to anon, authenticated using (false) with check (false);
+revoke all on table public.classroom_feed from anon, authenticated;
+
+create or replace function public.feed_pull(p_sync_id text)
+returns table (data jsonb, updated_at timestamptz)
+language sql
+security definer
+set search_path = public
+as $$
+  select f.data, f.updated_at from public.classroom_feed f where f.sync_id = p_sync_id;
+$$;
+
+create or replace function public.feed_push(p_sync_id text, p_data jsonb)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  ts timestamptz := now();
+begin
+  if p_sync_id is null or char_length(p_sync_id) < 32 or char_length(p_sync_id) > 128 then
+    raise exception 'invalid sync id';
+  end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'object' then
+    raise exception 'invalid data';
+  end if;
+  if pg_column_size(p_data) > 1000000 then
+    raise exception 'data too large';
+  end if;
+  insert into public.classroom_feed as f (sync_id, data, updated_at)
+  values (p_sync_id, p_data, ts)
+  on conflict (sync_id) do update set data = excluded.data, updated_at = ts;
+  return ts;
+end;
+$$;
+
+revoke all on function public.feed_pull(text) from public;
+revoke all on function public.feed_push(text, jsonb) from public;
+grant execute on function public.feed_pull(text) to anon, authenticated;
+grant execute on function public.feed_push(text, jsonb) to anon, authenticated;
+
 -- Tell the API layer to pick up the new functions straight away.
 notify pgrst, 'reload schema';
 
