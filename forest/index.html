@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Study Forest</title>
+<meta name="theme-color" content="#1f3a24">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-2 -8 18 16'%3E%3Cpath d='M0 0C3-4.6 9-4.8 13 0C9 4.8 3 4.6 0 0Z' fill='%2343b649'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f3f6f0;--card:#ffffff;--text:#1c2a1f;--muted:#5f6d62;--line:#dde4d8;--chip:#edf2e9;
+  --accent:#2f8f46;--accent-ink:#ffffff;--danger:#c0392b;
+  --trunk:#6b4a2f;--branch:#7b5637;--twig:#8a6644;--ground:#cfe2c2;--bud:#b8a48c;
+  --green:#43b649;--orange:#f29124;--red:#dd3b2f;--brown:#7d5432;--gold:#e9b824;--bare:#d5dccf;
+  --outline:#1fcf5c;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0f1410;--card:#182019;--text:#e6eee5;--muted:#99a99b;--line:#2a352b;--chip:#212a22;
+  --accent:#3fb75b;--accent-ink:#0b130c;--danger:#ff6b5b;
+  --trunk:#8d6646;--branch:#9b7452;--twig:#a5805c;--ground:#20331d;--bud:#7b6a57;
+  --bare:#334034;--outline:#3bff7c;
+  --shadow:0 1px 3px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit}
+header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-inner{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:8px;padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top))}
+.brand{font-weight:800;font-size:18px;text-decoration:none;display:flex;align-items:center;gap:8px;margin-right:auto;letter-spacing:-.01em}
+.brand svg{width:22px;height:22px}
+.icon-btn{border:1px solid var(--line);background:var(--card);border-radius:10px;height:36px;min-width:36px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-size:14px}
+.icon-btn svg{width:18px;height:18px}
+.sync-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.sync-pill[data-s="ok"] .dot{background:#2ecc71}
+.sync-pill[data-s="syncing"] .dot{background:#f1c40f;animation:pulse 1s infinite}
+.sync-pill[data-s="offline"] .dot{background:#95a5a6}
+.sync-pill[data-s="error"] .dot{background:#e74c3c}
+@keyframes pulse{50%{opacity:.3}}
+main{max-width:760px;margin:0 auto;padding:16px 16px 96px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+h1,h2,h3{margin:0 0 8px;line-height:1.2;letter-spacing:-.01em}
+h2{font-size:22px}
+h3{font-size:16px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.row{display:flex;align-items:center;gap:10px}
+.spread{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+.btn{border:0;border-radius:10px;padding:9px 14px;font-weight:650;cursor:pointer;background:var(--accent);color:var(--accent-ink);font-size:14px;white-space:nowrap}
+.btn.secondary{background:var(--chip);color:var(--text);border:1px solid var(--line)}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 40%,transparent)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 4px}
+.stat{background:var(--chip);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:20px}
+.stat span{font-size:12px;color:var(--muted)}
+.bar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--bare);margin:8px 0}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.c-gold{background:var(--gold)}.c-green{background:var(--green)}.c-orange{background:var(--orange)}.c-red{background:var(--red)}.c-brown{background:var(--brown)}.c-bare{background:var(--bare)}
+.forest{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media (min-width:620px){.forest{grid-template-columns:repeat(3,1fr)}}
+.subj-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;cursor:pointer;text-decoration:none;display:block;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.subj-card::before{content:"";position:absolute;left:0;top:0;right:0;height:4px;background:var(--sc)}
+.subj-card .mini{height:150px;display:flex;align-items:flex-end;justify-content:center}
+.subj-card .mini svg{max-height:150px;width:100%}
+.subj-card h3{margin:4px 0 0;font-size:15px}
+.subj-card .meta{font-size:12px;color:var(--muted)}
+.due-list{list-style:none;margin:0;padding:0}
+.due-list li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.due-list li:first-child{border-top:0}
+.due-list .name{flex:1;min-width:0}
+.due-list .name b{display:block;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.due-list .name span{font-size:12px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sdot{width:10px;height:10px;border-radius:50%;flex:none}
+.back{display:inline-flex;align-items:center;gap:4px;text-decoration:none;color:var(--muted);font-size:14px;margin-bottom:8px}
+.tree-wrap{background:linear-gradient(to bottom,color-mix(in srgb,var(--sc) 7%,var(--card)),var(--card));border:1px solid var(--line);border-radius:16px;padding:8px 4px 4px;margin-bottom:14px;box-shadow:var(--shadow)}
+.tree-wrap svg{width:100%;height:auto;display:block;max-width:560px;margin:0 auto;touch-action:manipulation}
+.hint{text-align:center;font-size:12px;color:var(--muted);padding:4px 0 6px}
+details.branch{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:8px;overflow:hidden}
+details.branch>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:10px}
+details.branch>summary::-webkit-details-marker{display:none}
+details.branch>summary .bt{flex:1;min-width:0}
+details.branch>summary .bt b{display:block;font-size:15px}
+details.branch>summary .dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+details.branch>summary .chev{transition:transform .2s;color:var(--muted)}
+details.branch[open]>summary .chev{transform:rotate(90deg)}
+.d{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--bare)}
+.d.green{background:var(--green)}.d.orange{background:var(--orange)}.d.red{background:var(--red)}.d.brown{background:var(--brown)}.d.gold{background:var(--gold)}
+.d.ol{box-shadow:0 0 0 1.5px var(--outline)}
+.twigs{list-style:none;margin:0;padding:0 8px 8px}
+.twigs li{display:flex;align-items:center;gap:10px;padding:8px 6px;border-top:1px solid var(--line);cursor:pointer;border-radius:8px}
+.twigs li:hover{background:var(--chip)}
+.twigs .tn{flex:1;min-width:0}
+.twigs .tn b{display:block;font-weight:550;font-size:14px}
+.twigs .tn span{display:block;font-size:12px;color:var(--muted)}
+.leaf-ico{width:26px;height:22px;flex:none}
+.tier{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:18px;padding:0 5px;border-radius:999px;font-size:11px;font-weight:800;color:#3a2800;background:linear-gradient(135deg,#ffe680,#e3a700);border:1px solid #8a6200;margin-left:6px;vertical-align:middle}
+.tier.t2{background:linear-gradient(135deg,#fff6c2,#f6c945 50%,#c98b00);box-shadow:0 0 0 2px #fff3b0}
+.tier.t3{background:linear-gradient(135deg,#fffbe6,#ffd23f 40%,#ff9f1c);box-shadow:0 0 0 2px #ffd23f,0 0 8px #ffcc33}
+.tier.t4{background:linear-gradient(135deg,#f7d6ff,#b28dff 50%,#6ec3ff);color:#1d0b3a;border-color:#6b4bd1;box-shadow:0 0 0 2px #c9a7ff,0 0 10px #b28dff;animation:tierglow 2.4s ease-in-out infinite}
+@keyframes tierglow{50%{box-shadow:0 0 0 2px #fff,0 0 16px #c9a7ff}}
+/* SVG tree */
+.trunk{fill:var(--trunk)}
+.branch-line{fill:none;stroke:var(--branch);stroke-linecap:round}
+.twig-line{stroke:var(--twig);stroke-width:1.6;stroke-linecap:round}
+.ground{fill:var(--ground)}
+.bud{fill:var(--bud)}
+.leaf{stroke:rgba(0,0,0,.28);stroke-width:.6}
+.st-green{fill:var(--green)}.st-orange{fill:var(--orange)}.st-red{fill:var(--red)}.st-brown{fill:var(--brown)}
+.st-gold.g1{fill:url(#sfGold1)}.st-gold.g2{fill:url(#sfGold2)}.st-gold.g3,.st-gold.g4{fill:url(#sfGold3)}
+.leaf.st-gold{stroke:#9a6b00;stroke-width:.8}
+.leaf.ol{stroke:var(--outline);stroke-width:2}
+.rib{fill:none;stroke:rgba(0,0,0,.22);stroke-width:.7;stroke-linecap:round}
+.rib.light{stroke:rgba(255,255,255,.75)}
+.shine{fill:#fff;opacity:0;animation:shine 2.6s ease-in-out infinite;pointer-events:none}
+@keyframes shine{50%{opacity:.55}}
+.badge circle.core{fill:url(#sfGold1);stroke:#7a5600;stroke-width:.7}
+.badge.b2 circle.core{fill:url(#sfGold2)}
+.badge.b3 circle.core{fill:url(#sfGold3)}
+.badge.b4 circle.core{fill:url(#sfPrism);stroke:#5a3cc0}
+.badge .ring{fill:none;stroke:#fff3b0;stroke-width:.9}
+.badge.b3 .ring{stroke:#ffd23f;stroke-width:1.1}
+.badge.b4 .ring{stroke:#c9a7ff;stroke-width:1.2;animation:shine 2.4s ease-in-out infinite;opacity:1}
+.badge text{fill:#3a2800;font-weight:800;text-anchor:middle;dominant-baseline:central;font-family:Georgia,"Times New Roman",serif;pointer-events:none}
+.badge.b4 text{fill:#1d0b3a}
+.hit{fill:transparent;cursor:pointer}
+.hit:focus{outline:none}
+svg.mini .twig-line{stroke-width:2.2}
+/* sheet */
+.sheet-wrap{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet-wrap[hidden]{display:none}
+.sheet-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.sheet{position:relative;background:var(--card);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:10px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px rgba(0,0,0,.25);max-height:88vh;overflow:auto;animation:up .18s ease-out}
+@media (min-width:600px){.sheet-wrap{align-items:center}.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}}
+.sheet-handle{width:40px;height:4px;border-radius:9px;background:var(--line);margin:0 auto 12px}
+.sheet .crumb{font-size:12px;color:var(--muted)}
+.sheet h3{font-size:19px;margin:2px 0 10px}
+.sheet .big-leaf{display:flex;justify-content:center;margin:6px 0 10px}
+.sheet .big-leaf svg{width:120px;height:90px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:8px 0 14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.sheet .actions{display:flex;gap:8px;flex-wrap:wrap}
+.sheet .actions .btn:first-child{flex:1}
+.status-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:13px;font-weight:600}
+/* toast */
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(120px);background:#1d2a1f;color:#fff;padding:10px 14px;border-radius:12px;display:flex;gap:12px;align-items:center;z-index:60;transition:transform .2s,opacity .2s;opacity:0;pointer-events:none;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
+#toast button{background:transparent;border:0;color:#7dff9a;font-weight:700;cursor:pointer;padding:0}
+/* settings */
+.field{display:block;margin:10px 0}
+.field span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.field input[type=text],.field input[type=password]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:14px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;word-break:break-all;background:var(--chip);padding:8px 10px;border-radius:8px;display:block}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.toggle-row:first-of-type{border-top:0}
+.switch{position:relative;width:44px;height:26px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch i{position:absolute;inset:0;background:var(--line);border-radius:99px;transition:.2s;cursor:pointer}
+.switch i::after{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.switch input:checked+i{background:var(--accent)}
+.switch input:checked+i::after{transform:translateX(18px)}
+.preview-banner{background:#fff4d6;color:#5a4300;border:1px solid #f0d58a;border-radius:12px;padding:10px 12px;margin-bottom:14px;display:flex;align-items:center;gap:10px;justify-content:space-between;font-size:14px}
+:root[data-theme="dark"] .preview-banner{background:#3a3014;color:#ffe9a8;border-color:#6b5520}
+input[type=range]{width:100%}
+.empty{text-align:center;color:var(--muted);padding:12px 0;font-size:14px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="sfGold1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe680"/><stop offset="1" stop-color="#e3a700"/></linearGradient>
+    <linearGradient id="sfGold2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6c2"/><stop offset=".5" stop-color="#f6c945"/><stop offset="1" stop-color="#c98b00"/></linearGradient>
+    <linearGradient id="sfGold3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffbe6"/><stop offset=".4" stop-color="#ffd23f"/><stop offset="1" stop-color="#ff9f1c"/></linearGradient>
+    <linearGradient id="sfPrism" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7d6ff"/><stop offset=".5" stop-color="#b28dff"/><stop offset="1" stop-color="#6ec3ff"/></linearGradient>
+    <filter id="sfGlow" x="-80%" y="-80%" width="260%" height="260%"><feDropShadow dx="0" dy="0" stdDeviation="1.8" flood-color="#ffcc33" flood-opacity=".95"/></filter>
+    <filter id="sfGlow2" x="-80%" y="-80%" width="260%" height="260%"><feDropShadow dx="0" dy="0" stdDeviation="2.4" flood-color="#c9a7ff" flood-opacity="1"/></filter>
+  </defs>
+</svg>
+
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="#/" aria-label="Study Forest home">
+      <svg viewBox="-2 -8 18 16"><path d="M0 0C3-4.6 9-4.8 13 0C9 4.8 3 4.6 0 0Z" fill="#43b649"/><path d="M1.5 0H11" stroke="rgba(0,0,0,.25)" stroke-width=".8"/></svg>
+      Study Forest
+    </a>
+    <button class="icon-btn sync-pill" id="syncPill" data-s="off" data-action="sync" title="Sync now"><span class="dot"></span><span id="syncText">Sync off</span></button>
+    <button class="icon-btn" data-action="theme" title="Toggle dark / light" aria-label="Toggle dark or light mode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+    <a class="icon-btn" href="#/settings" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </a>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<div class="sheet-wrap" id="sheetWrap" hidden>
+  <div class="sheet-backdrop" data-action="close-sheet"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Twig details">
+    <div class="sheet-handle"></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   1. CONFIG — paste your Supabase details here (see SETUP.md).
+   The anon / publishable key is designed to be public. It is safe in a
+   public repo because the database only allows the two functions below.
+   You can also enter these in Settings instead of editing this file.
+   ===================================================================== */
+const CONFIG = {
+  SUPABASE_URL: 'https://rxqcpfwydwzrqocwlxsr.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_mk8T5lxfiDEqM1i1wwidcA_nbzlQ-oH'   // publishable key (same project as the main study plan)
+};
+
+/* =====================================================================
+   2. CURRICULUM — edit freely.
+   Each subject → branches (topics) → twigs (subtopics).
+   opt: true marks an option/elective you can hide in Settings.
+   NOTE: a twig's saved progress is keyed by subject + branch name + twig
+   name, so renaming a branch or twig starts that twig fresh.
+   ===================================================================== */
+const POEM_GA = ['Achoimre (summary)','Téama','Mothúcháin','Teicnící fileata','Foclóir tábhachtach','Freagraí samplacha'];
+
+const CURRICULUM = [
+  { id:'english', name:'English', level:'HL', color:'#7c5cff', branches:[
+    { name:'Othello: Plot', twigs:['Act 1','Act 2','Act 3','Act 4','Act 5','Plot overview & structure'] },
+    { name:'Othello: Characters', twigs:['Othello','Iago','Desdemona','Cassio','Emilia','Roderigo','Brabantio & Bianca'] },
+    { name:'Othello: Themes', twigs:['Jealousy','Race & otherness','Deception & appearance vs reality','Love & marriage','Gender & power','Reputation & honour'] },
+    { name:'Othello: Drama & Language', twigs:['Soliloquies & asides','Dramatic irony','Imagery (animals, light & dark, poison)','Othello as tragic hero','Key quotes bank','Single-text essay practice'] },
+    { name:'1984', twigs:['Plot: Part One','Plot: Part Two','Plot: Part Three','Winston Smith','Julia',"O'Brien",'The Party & Big Brother','Key moments','Context: totalitarianism'] },
+    { name:'The Shawshank Redemption', twigs:['Plot overview','Andy Dufresne','Ellis "Red" Redding','Warden Norton & Captain Hadley','Brooks & Tommy','Key scenes','Film techniques (narration, camera, music)'] },
+    { name:'Small Things Like These', twigs:['Plot overview','Bill Furlong','Eileen & the daughters','Sarah & the convent','Mrs Wilson & Ned','Key moments','Context: 1985 Ireland & the laundries'] },
+    { name:'Comparative: Theme or Issue', twigs:['Theme in 1984','Theme in Shawshank','Theme in Small Things Like These','Linking the three texts','70-mark essay practice'] },
+    { name:'Comparative: Cultural Context', twigs:['Cultural context of 1984','Cultural context of Shawshank','Cultural context of Small Things Like These','Linking the three texts','70-mark essay practice'] },
+    { name:'Comparative: General Vision & Viewpoint', twigs:['GVV of 1984','GVV of Shawshank','GVV of Small Things Like These','Linking the three texts','70-mark essay practice'] },
+    { name:'Poet: W.B. Yeats', twigs:['The Lake Isle of Innisfree','September 1913','The Wild Swans at Coole','An Irish Airman Foresees his Death','Easter 1916','The Second Coming','Sailing to Byzantium',"The Stare's Nest by My Window",'In Memory of Eva Gore-Booth and Con Markiewicz',"Swift's Epitaph",'An Acre of Grass','Under Ben Bulben (V & VI)','Politics','Yeats: themes & style overview'] },
+    { name:'Poet: Elizabeth Bishop', twigs:['The Fish','The Bight','At the Fishhouses','The Prodigal','Questions of Travel','The Armadillo','Sestina','First Death in Nova Scotia','Filling Station','In the Waiting Room','Bishop: themes & style overview'] },
+    { name:'Poet: Emily Dickinson', twigs:['"Hope" is the thing with feathers',"There's a certain Slant of light",'I felt a Funeral, in my Brain','A Bird came down the Walk','I Heard a fly buzz – when I died','The Soul has Bandaged moments','I could bring You Jewels – had I a mind to','A narrow Fellow in the Grass','I taste a liquor never brewed','After great pain, a formal feeling comes','Dickinson: themes & style overview'] },
+    { name:'Poet: John Donne', twigs:['The Sunne Rising','Song: Go, and catch a falling star','The Anniversarie','Song: Sweetest love, I do not goe','The Dreame','A Valediction Forbidding Mourning','The Flea','Batter my heart',"At the round earth's imagined corners",'Thou hast made me','Donne: themes & style overview'] },
+    { name:'Poet: Adrienne Rich', twigs:["Aunt Jennifer's Tigers",'Uncle Speaks in the Drawing Room','Power','Storm Warnings','Living in Sin','The Roofwalker','Our Whole Life','Trying to Talk with a Man','Diving Into the Wreck','From a Survivor','Rich: themes & style overview'] },
+    { name:'Unseen Poetry', twigs:['Reading & annotating an unseen poem','Imagery, tone & sound','20-mark answer practice'] },
+    { name:'Paper 1: Comprehension (Question A)', twigs:['Reading the texts quickly','Short-answer questions','Style & language questions','50-mark answer practice'] },
+    { name:'Paper 1: Question B', twigs:['Speech / talk','Article / opinion piece','Letter & email','Report','Diary & blog','Introduction / review'] },
+    { name:'Paper 1: Composition', twigs:['Personal essay','Short story','Speech / debate','Article / feature','Descriptive essay','Discursive essay','Timed composition practice'] }
+  ]},
+
+  { id:'irish', name:'Irish', level:'OL', color:'#1fa36b', branches:[
+    { name:'Dán: Dínit an Bhróin', twigs:POEM_GA },
+    { name:'Dán: Iníon', twigs:POEM_GA },
+    { name:'Dán: Glaoch Abhaile', twigs:POEM_GA },
+    { name:'Béaltriail: Fáiltiú', twigs:['Ainm, aois & seoladh','Dáta breithe & uimhir scrúdaithe','Freagraí réidh'] },
+    { name:'Béaltriail: Léamh Filíochta', twigs:['Fuaimniú & rithim','Cleachtadh léitheoireachta 1','Cleachtadh léitheoireachta 2'] },
+    { name:'Béaltriail: Sraith Pictiúr', twigs:['Sraitheanna 1–5','Sraitheanna 6–10','Sraitheanna 11–15','Sraitheanna 16–20','Ceisteanna don scrúdaitheoir'] },
+    { name:'Béaltriail: Comhrá', twigs:['Mé féin & mo theaghlach','Mo cheantar','An scoil & ábhair','Caitheamh aimsire & spórt','Post páirtaimseartha','Laethanta saoire','Pleananna don todhchaí','Teicneolaíocht & na meáin','Saol na ndéagóirí','An Ghaeilge'] },
+    { name:'Cluastuiscint', twigs:['Fógraí','Comhráite','Píosaí nuachta','Uimhreacha, dátaí & logainmneacha'] },
+    { name:'Léamhthuiscint', twigs:['Cleachtadh 1','Cleachtadh 2','Foclóir na gceisteanna'] },
+    { name:'Ceapadóireacht', twigs:['Giota leanúnach / blag','Scéal','Litir / ríomhphost','Comhrá scríofa'] },
+    { name:'Gramadach', twigs:['An Aimsir Chaite','An Aimsir Láithreach','An Aimsir Fháistineach','An Modh Coinníollach','Séimhiú & urú','Briathra neamhrialta'] }
+  ]},
+
+  { id:'maths', name:'Maths', level:'HL', color:'#2f7de1', branches:[
+    { name:'Number Systems & Indices', twigs:['Number sets (N, Z, Q, R)','Laws of indices','Surds','Scientific notation & significant figures','Error & percentage error'] },
+    { name:'Logarithms', twigs:['Laws of logs','Change of base','Solving exponential equations','e and natural logs','Exponential & log graphs'] },
+    { name:'Financial Maths', twigs:['Compound interest & depreciation','AER, APR & rates','Present value','Loans & mortgages (amortisation)','Annuities & pensions','Income tax & USC'] },
+    { name:'Complex Numbers', twigs:['Argand diagram & operations','Modulus & conjugate','Division & equations','Polar form','De Moivre’s theorem','Roots of complex numbers','Transformations on the Argand diagram'] },
+    { name:'Sequences & Series', twigs:['Arithmetic sequences','Arithmetic series','Geometric sequences & series','Infinite geometric series & recurring decimals','Limits','Sigma notation','Quadratic patterns'] },
+    { name:'Proof by Induction', twigs:['Series sums','Divisibility','Inequalities','Factorial & other proofs'] },
+    { name:'Algebraic Expressions', twigs:['Expanding & factorising','Algebraic fractions','Changing the subject','Modulus (absolute value)'] },
+    { name:'Equations', twigs:['Simultaneous equations (3 variables)','Quadratic equations & roots','Linear & non-linear simultaneous','Equations with fractions & surds','Forming equations from context'] },
+    { name:'Inequalities', twigs:['Linear inequalities','Quadratic & rational inequalities','Modulus inequalities','Proving inequalities'] },
+    { name:'Polynomials', twigs:['Factor theorem','Solving cubics','Roots & coefficients','Polynomial division'] },
+    { name:'Functions & Graphs', twigs:['Domain, range & notation','Composite functions','Inverse functions (injective, surjective, bijective)','Graphing linear, quadratic & cubic','Exponential growth & decay','Transformations of graphs'] },
+    { name:'Differentiation', twigs:['First principles','Product, quotient & chain rules','Trig, exponential & log derivatives','Inverse trig derivatives','Second derivative'] },
+    { name:'Applications of Differentiation', twigs:['Tangents & slopes','Max, min & points of inflection','Increasing & decreasing functions','Curve sketching','Rates of change','Optimisation problems','Displacement, velocity & acceleration'] },
+    { name:'Integration', twigs:['Antiderivatives & indefinite integrals','Integrating exponential & trig functions','Definite integrals'] },
+    { name:'Applications of Integration', twigs:['Area under a curve','Area between curves','Average value of a function'] },
+    { name:'Probability', twigs:['Fundamental counting principle','Permutations & combinations','Probability rules & Venn diagrams','Conditional probability & independence','Tree diagrams','Expected value','Bernoulli trials & binomial'] },
+    { name:'Descriptive Statistics', twigs:['Data types & sampling','Measures of centre & spread','Histograms, stem & leaf, box plots','Scatter plots & correlation'] },
+    { name:'Inferential Statistics', twigs:['Normal distribution & z-scores','Empirical rule','Margin of error & confidence intervals','Hypothesis testing & p-values'] },
+    { name:'Coordinate Geometry: Line', twigs:['Distance, midpoint & slope','Equation of a line','Parallel & perpendicular lines','Area of a triangle','Dividing a line in a ratio','Perpendicular distance','Angle between two lines'] },
+    { name:'Coordinate Geometry: Circle', twigs:['Centre-radius form','General equation','Position of a point','Line & circle intersection','Tangents','Touching circles'] },
+    { name:'Geometry & Constructions', twigs:['Axioms & corollaries','Theorems','Proofs of examinable theorems','Constructions','Enlargements'] },
+    { name:'Trigonometry', twigs:['Right-angled trig & special angles','Unit circle & radians','Sine & cosine rules, area','3D trig problems','Trig graphs, period & range','Trig identities & formulae','Solving trig equations'] },
+    { name:'Length, Area & Volume', twigs:['Arcs & sectors','Trapezoidal rule','3D solids (cylinder, cone, sphere)','Recasting & displacement problems','Nets'] }
+  ]},
+
+  { id:'physics', name:'Physics', level:'HL', color:'#e2562f', branches:[
+    { name:'Nature of Science', twigs:['How science works & peer review','Hypotheses & fair tests','Errors, accuracy & precision','SI units, prefixes & sig figs','Unit analysis & order of magnitude','Models in physics','Evaluating evidence & bias'] },
+    { name:'Motion in a Straight Line', twigs:['Displacement, velocity & acceleration','s–t and v–t graphs','Deriving the equations of motion','Using the equations of motion','Scalars & vectors','Resolving & adding vectors'] },
+    { name:"Forces & Newton's Laws", twigs:["Newton's three laws",'Mass & centre of mass','Types of force','Resultant force & F = ma',"Verifying Newton's 2nd law"] },
+    { name:'Pressure & Density', twigs:['Pressure P = F/A','Pressure in fluids P = hρg','Density ρ = m/V','Investigating density'] },
+    { name:'Momentum & Collisions', twigs:['Momentum p = mv','Conservation of momentum','Collisions in 1D','Collisions in 2D'] },
+    { name:"Hooke's Law & Springs", twigs:['Stretching & compressing','F = −kx',"Verifying Hooke's law",'Spring problems'] },
+    { name:'Work, Energy & Power', twigs:['Work done','Potential & kinetic energy','Elastic PE ½ks²','Power','Conservation of energy'] },
+    { name:'Gravitation', twigs:['Models for g (incl. pendulum)',"Newton's law of gravitation","g at a point & on a planet's surface",'Escape velocity'] },
+    { name:'Circular Motion & Satellites', twigs:['Centripetal force F = mv²/r','Angular velocity',"Kepler's 3rd law",'Near-Earth & geostationary orbits','Uses of satellites'] },
+    { name:'Heat & Temperature', twigs:['Temperature & thermometric properties','Kelvin & Celsius','Specific heat capacity','Specific latent heat','Efficiency'] },
+    { name:'Heat Transfer & Insulation', twigs:['Conduction & convection (particle model)','Heat pumps','U-values','Insulation & sustainability'] },
+    { name:'Waves', twigs:['Mechanical vs electromagnetic','Transverse vs longitudinal','Wave characteristics','v = fλ & T = 1/f','Amplitude & energy','Resonance'] },
+    { name:'Wave Behaviour', twigs:['Reflection',"Refraction & Snell's law",'Refractive index','Critical angle & TIR','Diffraction','Polarisation'] },
+    { name:'Lenses & Optics', twigs:['Ray diagrams','Converging & diverging lenses','1/f = 1/u + 1/v','Optics in technology & medicine'] },
+    { name:'Electromagnetic Spectrum', twigs:['The EM spectrum & sources','Ionising radiation','Dispersion','Solar irradiance I = P/A'] },
+    { name:'Sound & Doppler Effect', twigs:['Sound needs a medium','Pitch & loudness','Ultrasound','The Doppler effect'] },
+    { name:'Superposition & Interference', twigs:['Principle of superposition','Stationary waves: nodes & antinodes','Harmonics & fundamental frequency','f = (1/2l)√(T/μ)','Coherence & interference',"Young's slits",'Diffraction grating nλ = d sinθ'] },
+    { name:'Electrostatics', twigs:['Charging by friction & induction','Conductors vs insulators','Charge distribution & earthing',"Coulomb's law",'Electric field strength E = F/q','Field lines','Electric potential V = W/q'] },
+    { name:'Circuit Basics', twigs:['Current I = Q/t','Potential difference & emf','Power P = VI = I²R',"Ohm's law",'Resistivity R = ρl/A','Series vs parallel','Non-ohmic conductors','Temperature & resistance'] },
+    { name:'Electrical Safety', twigs:['Heating effect of current','Earthing','Fuses & MCBs','RCDs'] },
+    { name:'Semiconductors', twigs:['Doping: n-type & p-type','p-n junction & depletion layer','Diode: forward & reverse bias','Transistor as a switch','LDR, LED & thermistor'] },
+    { name:'Magnetism', twigs:['Fields around magnets','Field around a wire & solenoid','Effect of a ferrous core','Force on a moving charge','Permanent vs temporary magnets'] },
+    { name:'Motor Effect & DC Motor', twigs:['F = BIL',"Fleming's left-hand rule",'DC motor','Split-ring commutator'] },
+    { name:'Electromagnetic Induction', twigs:['Magnetic flux Φ = BA',"Faraday's law","Lenz's law",'AC & DC generators','Transformers','RMS values','National grid & transmission losses'] },
+    { name:'The Electron', twigs:['Charge on the electron','Thermionic emission & cathode rays (CRT)','Deflection in E & B fields'] },
+    { name:'Photoelectric Effect & X-Rays', twigs:['Photoelectric effect','Threshold frequency & work function',"E = hf & Einstein's equation",'Wave–particle duality','Photocells & sensors','X-ray production'] },
+    { name:'Atomic Models', twigs:['Thomson model','Rutherford model','Bohr model & energy levels','Emission spectra'] },
+    { name:'Radioactivity', twigs:['Background radiation','Detecting radiation','Alpha, beta & gamma','Decay equations','Half-life & activity','Isotopes, mass defect & binding energy','Safety','Strong & weak nuclear forces'] },
+    { name:'Particle Physics', twigs:['Cockcroft & Walton','E = mc²','Fermions & bosons','Matter & antimatter','The standard model'] },
+    { name:'Nuclear Energy', twigs:['Fission','Fusion','Chain reactions','Nuclear power & electricity','Positron–electron annihilation'] }
+  ]},
+
+  { id:'dcg', name:'DCG', level:'HL', color:'#d4a017', branches:[
+    { name:'Orthographic & Auxiliary Projection', twigs:['First & third angle projection','Auxiliary views','True lengths & shapes','Sectional views'] },
+    { name:'Pictorial Projection', twigs:['Isometric & isometric scale','Dimetric & trimetric','Oblique projection','Axonometric planes'] },
+    { name:'Perspective Drawing', twigs:['Picture plane, horizon & vanishing points','Two-point perspective','Measuring lines','Circles & curves in perspective'] },
+    { name:'Conic Sections', twigs:['Ellipse','Parabola','Hyperbola','Focus, directrix & eccentricity','Tangents to conics'] },
+    { name:'Plane Geometry', twigs:['Tangency & circles','Inscribed & escribed circles','Similar figures & proportion','Transformations'] },
+    { name:'Lines & Planes', twigs:['True length & inclination of lines','Oblique planes & traces','True shape of planes','Dihedral angle','Line–plane intersection','Skew lines'] },
+    { name:'Sections & Intersections of Solids', twigs:['Sections of prisms & pyramids','Sections of cylinders & cones','Intersection of solids','Spheres'] },
+    { name:'Developments', twigs:['Prisms & cylinders','Pyramids & cones','Truncated solids','Envelopments'] },
+    { name:'Freehand Sketching', twigs:['Line quality & proportion','Pictorial sketching','Rendering & shading','Exploded sketches'] },
+    { name:'Communication of Design', twigs:['Design process','Design analysis & appraisal','Layout & presentation','Ergonomics & aesthetics'] },
+    { name:'CAD (SolidWorks)', twigs:['Sketches & features','Parts','Assemblies & mates','Drawings & dimensioning','Rendering & presentation'] },
+    { name:'Exam: Section A Short Questions', twigs:['Timing strategy','Practice set 1','Practice set 2'] },
+    { name:'Option: Dynamic Mechanisms', opt:true, twigs:['Loci of points on mechanisms','Cycloids & trochoids','Involute & helix','Archimedean spiral','Tangents to loci','Cam profiles & displacement diagrams'] },
+    { name:'Option: Structural Forms', opt:true, twigs:['Natural & manufactured forms','Singly & doubly ruled surfaces','Hyperbolic paraboloid','Hyperboloid of revolution','Plane directors','Geodesic domes'] },
+    { name:'Option: Geologic Geometry', opt:true, twigs:['Strike & dip','Apparent dip','Outcrops','Contours & profiles','Cuttings & embankments','Tunnels & ore veins'] },
+    { name:'Option: Surface Geometry', opt:true, twigs:['Surfaces of revolution','Intersection of surfaces','Developments of surfaces','Transition pieces'] },
+    { name:'Option: Assemblies', opt:true, twigs:['Reading assembly drawings','Sectional views of assemblies','Standards & conventions','Fasteners & threads','Exploded views'] }
+  ]},
+
+  { id:'technology', name:'Technology', level:'HL', color:'#13a3b5', branches:[
+    { name:'Design Process', twigs:['Analysing a brief','Research & specification','Generating ideas','Development & modelling','Evaluation','Ergonomics & anthropometrics'] },
+    { name:'Communication Graphics', twigs:['Sketching','Orthographic & isometric','CAD','Rendering','Flowcharts & diagrams'] },
+    { name:'Project & Quality Management', twigs:['Planning & Gantt charts','Quality assurance vs control','Costing','Risk & health & safety'] },
+    { name:'Materials', twigs:['Material properties','Ferrous & non-ferrous metals','Timber & manufactured boards','Plastics (thermo & thermoset)','Composites & smart materials','Selecting materials'] },
+    { name:'Production Processes', twigs:['Wasting','Forming (vacuum forming, moulding)','Joining & fixings','Finishing','CNC, laser cutting & 3D printing'] },
+    { name:'Structures', twigs:['Forces: tension, compression, shear, torsion, bending','Frames & triangulation','Beams','Stress & strain'] },
+    { name:'Mechanisms', twigs:['Levers','Linkages','Gears & gear ratios','Pulleys & belts','Cams','Mechanical advantage & velocity ratio'] },
+    { name:'Energy', twigs:['Energy conversion','Renewable vs non-renewable','Efficiency','Batteries & power supplies'] },
+    { name:'Electricity & Electronics', twigs:["Ohm's law",'Series & parallel','Resistors & capacitors','Diodes & LEDs','Transistors','Sensors (LDR, thermistor)'] },
+    { name:'Control & Programming', twigs:['Inputs & outputs','Microcontrollers','Flowcharts & programming','Motors, servos & steppers'] },
+    { name:'ICT in Technology', twigs:['Networks & the internet','CAD/CAM','Data & communication'] },
+    { name:'Technology & Society', twigs:['Impact of technology','Sustainability & environment','Ethics'] },
+    { name:'Option: Applied Control Systems', opt:true, twigs:['Open & closed loop control','Pneumatics','Programmable control','Sensors & actuators','Robotics','Feedback'] },
+    { name:'Option: Electronics & Control', opt:true, twigs:['Semiconductors','Transistor circuits','Op-amps & comparators','Logic gates & Boolean algebra','555 timer','Microcontroller interfacing'] },
+    { name:'Option: Information & Communications Technology', opt:true, twigs:['Computer systems','Networks','Programming','Databases','Web & multimedia','Data security'] },
+    { name:'Option: Manufacturing Systems', opt:true, twigs:['One-off, batch & mass production','CAD/CAM & CNC','Automation & robotics','Quality control','Lean & just-in-time','Production planning'] },
+    { name:'Option: Materials Technology', opt:true, twigs:['Atomic structure & bonding','Metals & alloys','Heat treatment','Polymers','Composites','Material testing','Corrosion'] }
+  ]},
+
+  { id:'geography', name:'Geography', level:'HL', color:'#8a6d3b', branches:[
+    { name:'Plate Tectonics', twigs:['Structure of the Earth','Plate theory & evidence','Constructive boundaries','Destructive boundaries','Conservative boundaries','Hotspots'] },
+    { name:'Volcanoes & Earthquakes', twigs:['Volcanic activity & landforms','Earthquakes & measurement','Prediction & human impact'] },
+    { name:'Folding & Faulting', twigs:['Fold mountains','Faults & rift valleys'] },
+    { name:'Rocks', twigs:['Igneous rocks','Sedimentary rocks','Metamorphic rocks','The rock cycle','Human interaction with rocks'] },
+    { name:'Weathering & Karst', twigs:['Mechanical weathering','Chemical weathering','Karst surface landforms','Karst underground landforms'] },
+    { name:'Mass Movement', twigs:['Types of mass movement','Factors affecting mass movement','Human interaction'] },
+    { name:'Rivers', twigs:['River processes','Erosional landforms','Depositional landforms','Human interaction with rivers'] },
+    { name:'Coasts', twigs:['Coastal processes','Erosional landforms','Depositional landforms','Human interaction with coasts'] },
+    { name:'Glaciation', twigs:['Glacial processes','Erosional landforms','Depositional & fluvioglacial landforms'] },
+    { name:'Isostasy & Landscape Development', twigs:['Isostasy','Rejuvenation','Landscape development & peneplains'] },
+    { name:'Regions: Concepts', twigs:['Types of region','Climatic regions','Administrative & cultural regions','Socio-economic regions'] },
+    { name:'Irish Core Region', twigs:['Physical processes','Primary activities','Secondary activities','Tertiary activities','Human processes'] },
+    { name:'Irish Peripheral Region', twigs:['Physical processes','Primary activities','Secondary activities','Tertiary activities','Human processes'] },
+    { name:'European Core Region', twigs:['Physical processes','Primary activities','Secondary activities','Tertiary activities','Human processes'] },
+    { name:'European Peripheral Region', twigs:['Physical processes','Primary activities','Secondary activities','Tertiary activities','Human processes'] },
+    { name:'Sub-continental Region', twigs:['Physical processes','Primary activities','Secondary activities','Tertiary activities','Human processes'] },
+    { name:'Changing Regions & Boundaries', twigs:['Changing political boundaries','Language & cultural regions','Urban growth & regions'] },
+    { name:'Map & Photo Skills', twigs:['OS map skills','Aerial photographs','Satellite images','Graphs & charts','Weather maps'] },
+    { name:'Exam Technique', twigs:['Short questions','SRPs (significant relevant points)','80-mark long questions','30-mark essays'] },
+    { name:'Elective 4: Economic Activities', opt:true, twigs:['Economic development & indicators','Changing patterns of economic activity','Ireland & the EU economy','Globalisation & MNCs','Environmental impact & sustainability','Renewable & non-renewable resources'] },
+    { name:'Elective 5: Human Environment', opt:true, twigs:['Population dynamics','Population structure & density','Migration','Settlement patterns','Urban growth & planning','Urban problems'] },
+    { name:'Option: Global Interdependence', opt:true, twigs:['Models of development','Aid & trade','Globalisation','Debt','Environmental impact','Empowerment'] },
+    { name:'Option: Geoecology', opt:true, twigs:['Soil composition & characteristics','Soil-forming processes','Soil types','Human interference with soils','Biomes','Human impact on biomes'] },
+    { name:'Option: Culture & Identity', opt:true, twigs:['Race & ethnicity','Language','Religion','Cultural regions & boundaries','Nationalism & conflict'] },
+    { name:'Option: Atmosphere-Ocean Environment', opt:true, twigs:['Heat budget & atmospheric circulation','Ocean currents','Air masses & fronts','Climate classification','El Niño','Climate change'] }
+  ]}
+];
+
+/* =====================================================================
+   3. LEAF RULES (all timers count from when you first studied the twig)
+   green → 24h orange → 2 weeks red → 4 weeks brown → study → gold
+   gold → 2 months later back to green and the cycle restarts.
+   Each gold earned adds a tier badge (I, II, III…).
+   ===================================================================== */
+const DAY = 86400000;
+const T_ORANGE = 1 * DAY;
+const T_RED = 14 * DAY;
+const T_BROWN = 28 * DAY;
+const T_GOLD_RESET = 60 * DAY;
+
+/* ===================================================================== */
+const LS_STATE = 'sf-state-v1', LS_SYNC = 'sf-sync-id', LS_SUPA = 'sf-supa', LS_THEME = 'sf-theme', LS_LAST = 'sf-last-sync';
+const LEAF = 'M0 0C3-4.6 9-4.8 13 0C9 4.8 3 4.6 0 0Z';
+const STAGE_ORDER = ['gold','green','orange','red','brown','bare'];
+const STAGE_NAME = {bare:'Not studied',green:'Green',orange:'Orange',red:'Red',brown:'Brown',gold:'Gold'};
+
+function slug(s){ return String(s).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function roman(n){ const m=[[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']]; let s=''; for(const [v,r] of m){ while(n>=v){ s+=r; n-=v; } } return s; }
+
+const SUBJECTS = CURRICULUM.map(s => ({
+  ...s,
+  branches: s.branches.map(b => {
+    const key = s.id + '/' + slug(b.name);
+    return { ...b, key, twigs: b.twigs.map(t => ({ name:t, id: key + '/' + slug(t) })) };
+  })
+}));
+const TWIG_INDEX = {};
+SUBJECTS.forEach(s => s.branches.forEach(b => b.twigs.forEach(t => { TWIG_INDEX[t.id] = { subj:s, branch:b, twig:t }; })));
+
+/* ---------------- state ---------------- */
+function blankState(){ return { v:1, twigs:{}, settings:{ hidden:{}, u:0 } }; }
+function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+function loadLocal(){
+  try {
+    const raw = lsGet(LS_STATE);
+    if(!raw) return blankState();
+    const s = JSON.parse(raw);
+    if(!s || typeof s !== 'object' || !s.twigs) return blankState();
+    s.settings = s.settings || { hidden:{}, u:0 };
+    s.settings.hidden = s.settings.hidden || {};
+    return s;
+  } catch(e){ return blankState(); }
+}
+let state = loadLocal();
+function saveLocal(){ lsSet(LS_STATE, JSON.stringify(state)); }
+function persist(){ saveLocal(); schedulePush(); }
+
+let previewDays = 0;
+function now(){ return Date.now() + previewDays * DAY; }
+
+/* ---------------- leaf logic ---------------- */
+function effective(rec, t){
+  if(!rec || !rec.s) return { stage:'bare', t: rec ? (rec.t||0) : 0, r:[] };
+  let s = rec.s, r = rec.r || [], g = rec.g || null;
+  const tier = rec.t || 0;
+  while(g && t >= g + T_GOLD_RESET){ s = g + T_GOLD_RESET; r = []; g = null; }
+  if(g) return { stage:'gold', s, r, g, t:tier, outline:false, next: g + T_GOLD_RESET };
+  const age = t - s;
+  if(age < T_ORANGE) return { stage:'green', s, r, g:null, t:tier, outline:false, next: s + T_ORANGE };
+  if(age < T_RED)    return { stage:'orange', s, r, g:null, t:tier, outline: r.some(x => x >= s + T_ORANGE), next: s + T_RED };
+  if(age < T_BROWN)  return { stage:'red', s, r, g:null, t:tier, outline: r.some(x => x >= s + T_RED), next: s + T_BROWN };
+  return { stage:'brown', s, r, g:null, t:tier, outline:false, next:null };
+}
+function eff(id){ return effective(state.twigs[id], now()); }
+function isDue(e){ return (e.stage === 'orange' || e.stage === 'red') ? !e.outline : e.stage === 'brown'; }
+function urgency(e){ return e.stage === 'brown' ? 3 : e.stage === 'red' ? 2 : e.stage === 'orange' ? 1 : 0; }
+
+function study(id){
+  if(previewDays){ toast('Preview mode is on, so studying is paused.'); return; }
+  const t = Date.now();
+  const prev = state.twigs[id] ? JSON.parse(JSON.stringify(state.twigs[id])) : null;
+  const e = effective(state.twigs[id], t);
+  let rec, msg;
+  if(e.stage === 'bare'){ rec = { s:t, r:[], g:null, t:e.t }; msg = 'A new leaf grew 🌱'; }
+  else if(e.stage === 'gold'){ toast('Already gold. It rests until it turns green again.'); return; }
+  else if(e.stage === 'brown'){ rec = { s:e.s, r:[...e.r, t].slice(-30), g:t, t:e.t + 1 }; msg = 'Gold leaf! Tier ' + roman(e.t + 1) + ' ✨'; }
+  else { rec = { s:e.s, r:[...e.r, t].slice(-30), g:null, t:e.t }; msg = e.stage === 'green' ? 'Logged. Still fresh and green.' : 'Review logged ✓'; }
+  rec.u = t;
+  state.twigs[id] = rec;
+  persist();
+  render(); refreshSheet();
+  toast(msg, () => {
+    state.twigs[id] = prev ? { ...prev, u: Date.now() } : { s:null, r:[], g:null, t:0, u: Date.now() };
+    persist(); render(); refreshSheet();
+  });
+}
+function resetTwig(id){
+  if(!confirm('Reset this twig? Its leaf and gold tiers will be cleared.')) return;
+  state.twigs[id] = { s:null, r:[], g:null, t:0, u: Date.now() };
+  persist(); render(); refreshSheet(); toast('Twig reset');
+}
+
+/* ---------------- visibility & stats ---------------- */
+function visibleBranches(subj){ return subj.branches.filter(b => !state.settings.hidden[b.key]); }
+function subjectStats(subj){
+  const c = { bare:0, green:0, orange:0, red:0, brown:0, gold:0, total:0, due:0, tiers:0 };
+  visibleBranches(subj).forEach(b => b.twigs.forEach(tw => {
+    const e = eff(tw.id); c[e.stage]++; c.total++; if(isDue(e)) c.due++; c.tiers += e.t || 0;
+  }));
+  c.grown = c.total - c.bare;
+  return c;
+}
+function allStats(){
+  const c = { bare:0, green:0, orange:0, red:0, brown:0, gold:0, total:0, due:0, tiers:0, grown:0 };
+  SUBJECTS.forEach(s => { const x = subjectStats(s); for(const k in c) c[k] += x[k]; });
+  return c;
+}
+function barHTML(c){
+  if(!c.total) return '<div class="bar"></div>';
+  const seg = st => c[st] ? `<i class="c-${st}" style="width:${(c[st]/c.total*100).toFixed(2)}%"></i>` : '';
+  return `<div class="bar" role="img" aria-label="Leaf colours">${['gold','green','orange','red','brown'].map(seg).join('')}</div>`;
+}
+const LEGEND = `<div class="legend"><span><i class="sw c-green"></i>Green</span><span><i class="sw c-orange"></i>Orange</span><span><i class="sw c-red"></i>Red</span><span><i class="sw c-brown"></i>Brown</span><span><i class="sw c-gold"></i>Gold</span><span><i class="sw c-bare"></i>Bare</span></div>`;
+
+/* ---------------- formatting ---------------- */
+function fmtDur(ms){
+  if(ms <= 0) return 'now';
+  const m = Math.round(ms / 60000);
+  if(m < 60) return m + 'm';
+  const h = Math.round(ms / 3600000);
+  if(h < 48) return h + 'h';
+  return Math.round(ms / DAY) + 'd';
+}
+function fmtDate(ts){ return new Date(ts).toLocaleDateString('en-IE', { day:'numeric', month:'short' }) + ', ' + new Date(ts).toLocaleTimeString('en-IE', { hour:'2-digit', minute:'2-digit' }); }
+function statusText(e){
+  const t = now(), left = e.next ? fmtDur(e.next - t) : '';
+  switch(e.stage){
+    case 'bare': return 'Not studied yet';
+    case 'green': return 'Fresh · turns orange in ' + left;
+    case 'orange': return (e.outline ? 'Reviewed ✓' : 'Review due') + ' · turns red in ' + left;
+    case 'red': return (e.outline ? 'Reviewed ✓' : 'Slipping, review it') + ' · turns brown in ' + left;
+    case 'brown': return 'Withered · study it to turn gold';
+    case 'gold': return 'Gold · back to green in ' + left;
+  }
+}
+function studyLabel(e){
+  switch(e.stage){
+    case 'bare': return 'Mark as studied';
+    case 'green': return 'Studied again';
+    case 'orange': case 'red': return e.outline ? 'Log another review' : 'Log review';
+    case 'brown': return 'Study → turn gold';
+    case 'gold': return 'Gold, resting';
+  }
+}
+function tierChip(t){ return t >= 1 ? `<span class="tier t${Math.min(t,4)}">${roman(t)}</span>` : ''; }
+
+/* ---------------- SVG pieces ---------------- */
+function badgeSVG(x, y, t, r){
+  const tc = 'b' + Math.min(t, 4), txt = roman(t);
+  const fs = txt.length > 2 ? r * 0.85 : txt.length === 2 ? r * 1.05 : r * 1.3;
+  return `<g class="badge ${tc}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"${t >= 4 ? ' filter="url(#sfGlow2)"' : ''}>`
+    + (t >= 2 ? `<circle class="ring" r="${(r + 1.7).toFixed(1)}"/>` : '')
+    + `<circle class="core" r="${r}"/><text font-size="${fs.toFixed(1)}">${txt}</text></g>`;
+}
+function leafShape(e){
+  if(e.stage === 'bare') return '';
+  const gold = e.stage === 'gold';
+  const tierC = gold ? ' g' + Math.min(Math.max(e.t,1), 4) : '';
+  const cls = 'leaf st-' + e.stage + tierC + (e.outline ? ' ol' : '');
+  return `<path class="${cls}" d="${LEAF}"/><path class="rib${gold ? ' light' : ''}" d="M1.5 0H11"/>` + (gold && e.t >= 4 ? `<path class="shine" d="${LEAF}"/>` : '');
+}
+function leafIcon(e){
+  if(e.stage === 'bare') return `<svg class="leaf-ico" viewBox="-3 -9 20 18"><line x1="-3" y1="0" x2="5" y2="0" stroke="var(--twig)" stroke-width="1.6" stroke-linecap="round"/><circle class="bud" cx="6" cy="0" r="2.4"/></svg>`;
+  const f = e.stage === 'gold' && e.t >= 3 ? ` filter="url(#sfGlow)"` : '';
+  return `<svg class="leaf-ico" viewBox="-3 -9 20 18"><g${f}>${leafShape(e)}</g></svg>`;
+}
+function bigLeaf(e){
+  const f = e.stage === 'gold' && e.t >= 3 ? ` filter="url(#sfGlow)"` : '';
+  const body = e.stage === 'bare'
+    ? `<line x1="-6" y1="0" x2="5" y2="0" stroke="var(--twig)" stroke-width="1.4" stroke-linecap="round"/><circle class="bud" cx="6.5" cy="0" r="2.6"/>`
+    : `<g transform="rotate(-20 6 0)"${f}>${leafShape(e)}</g>`;
+  return `<svg viewBox="-8 -12 28 22">${body}${e.t >= 1 ? badgeSVG(14, -7, e.t, 3.6) : ''}</svg>`;
+}
+
+function treeSVG(subj, mini){
+  const brs = visibleBranches(subj);
+  const t = now();
+  const W = 420, cx = 210, gap = 34, ang = 24 * Math.PI / 180;
+  const n = Math.max(brs.length, 1);
+  const topAttach = -70 - (n - 1) * gap;
+  const trunkTop = topAttach - 24;
+  const halfW = y => 3 + 12 * Math.min(1, Math.max(0, (y - trunkTop) / (0 - trunkTop)));
+  const branches = [], twigs = [], leaves = [], badges = [], hits = [];
+  let minY = trunkTop - 20, minX = 0, maxX = W;
+
+  brs.forEach((b, i) => {
+    const side = i % 2 === 0 ? -1 : 1;
+    const y0 = -70 - i * gap;
+    const m = b.twigs.length;
+    const L = Math.max(80, Math.min(188, 46 + m * 15));
+    const x0 = cx + side * halfW(y0) * 0.5;
+    const x2 = cx + side * L * Math.cos(ang), y2 = y0 - L * Math.sin(ang);
+    const x1 = cx + side * L * 0.55 * Math.cos(ang), y1 = y0 - L * 0.55 * Math.sin(ang) + 12;
+    const bw = mini ? 6 : Math.max(2.4, 6 - i * 0.08);
+    branches.push(`<path class="branch-line" stroke-width="${bw.toFixed(1)}" d="M${x0.toFixed(1)} ${y0.toFixed(1)}Q${x1.toFixed(1)} ${y1.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}"/>`);
+    b.twigs.forEach((tw, k) => {
+      const u = 0.22 + 0.76 * (k + 0.5) / m;
+      const px = (1-u)*(1-u)*x0 + 2*(1-u)*u*x1 + u*u*x2;
+      const py = (1-u)*(1-u)*y0 + 2*(1-u)*u*y1 + u*u*y2;
+      const dx = 2*(1-u)*(x1-x0) + 2*u*(x2-x1), dy = 2*(1-u)*(y1-y0) + 2*u*(y2-y1);
+      const th = Math.atan2(dy, dx);
+      const ta = th + (k % 2 === 0 ? -0.85 : 0.85);
+      const tl = 12;
+      const tx = px + Math.cos(ta) * tl, ty = py + Math.sin(ta) * tl;
+      twigs.push(`<line class="twig-line" x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}"/>`);
+      const e = effective(state.twigs[tw.id], t);
+      const ls = mini ? 1.25 : 1.3;
+      const lcx = tx + Math.cos(ta) * 6.5 * ls, lcy = ty + Math.sin(ta) * 6.5 * ls;
+      if(e.stage === 'bare'){
+        leaves.push(`<circle class="bud" cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="${mini ? 3 : 2.2}"/>`);
+      } else {
+        const deg = ta * 180 / Math.PI;
+        const glow = e.stage === 'gold' && e.t >= 3 ? ' filter="url(#sfGlow)"' : '';
+        leaves.push(`<g transform="translate(${tx.toFixed(1)} ${ty.toFixed(1)}) rotate(${deg.toFixed(1)}) scale(${ls})"${glow}>${leafShape(e)}</g>`);
+      }
+      if(!mini && e.t >= 1) badges.push(badgeSVG(lcx, lcy - 10, e.t, e.stage === 'gold' ? 5.2 : 4.2));
+      if(!mini) hits.push(`<circle class="hit" cx="${lcx.toFixed(1)}" cy="${lcy.toFixed(1)}" r="10" data-open="${tw.id}" tabindex="0" role="button" aria-label="${esc(b.name + ': ' + tw.name)}"/>`);
+      minY = Math.min(minY, ty - 18, lcy - 18);
+      minX = Math.min(minX, tx - 16); maxX = Math.max(maxX, tx + 16);
+    });
+    minY = Math.min(minY, y2 - 18);
+  });
+
+  const trunk = `<path class="trunk" d="M${cx-16} 6Q${cx-8} ${(trunkTop*0.45).toFixed(1)} ${cx-3} ${trunkTop}Q${cx} ${trunkTop-8} ${cx+3} ${trunkTop}Q${cx+8} ${(trunkTop*0.45).toFixed(1)} ${cx+16} 6Z"/>`;
+  const roots = `<path class="trunk" d="M${cx-16} 6Q${cx-30} 10 ${cx-40} 14L${cx-12} 12ZM${cx+16} 6Q${cx+30} 10 ${cx+40} 14L${cx+12} 12Z"/>`;
+  const ground = `<ellipse class="ground" cx="${cx}" cy="14" rx="170" ry="12"/>`;
+  const vbY = Math.floor(minY - 6), vbH = Math.ceil(30 - vbY);
+  const vbX = Math.floor(minX), vbW = Math.ceil(maxX - minX);
+  return `<svg class="${mini ? 'mini' : 'tree'}" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" preserveAspectRatio="xMidYMax meet" role="img" aria-label="${esc(subj.name)} tree">`
+    + ground + roots + branches.join('') + trunk + twigs.join('') + leaves.join('') + badges.join('') + hits.join('') + `</svg>`;
+}
+
+/* ---------------- views ---------------- */
+const app = document.getElementById('app');
+let openBranches = new Set();
+let showAllDue = false;
+
+function previewBanner(){
+  return previewDays ? `<div class="preview-banner"><span>Previewing <b>+${previewDays} days</b>. Studying is paused.</span><button class="btn sm secondary" data-action="end-preview">Back to today</button></div>` : '';
+}
+
+function renderHome(){
+  const c = allStats();
+  const due = [];
+  SUBJECTS.forEach(s => visibleBranches(s).forEach(b => b.twigs.forEach(tw => {
+    const e = eff(tw.id); if(isDue(e)) due.push({ s, b, tw, e });
+  })));
+  due.sort((a, b) => urgency(b.e) - urgency(a.e) || a.e.s - b.e.s);
+  const shown = showAllDue ? due : due.slice(0, 8);
+  const pct = c.total ? Math.round(c.grown / c.total * 100) : 0;
+
+  app.innerHTML = previewBanner() + `
+  <section class="card">
+    <div class="row spread"><h2>Your forest</h2><span class="muted small">${c.grown}/${c.total} twigs grown</span></div>
+    ${barHTML(c)}
+    <div class="stats">
+      <div class="stat"><b>${pct}%</b><span>grown</span></div>
+      <div class="stat"><b>${c.gold}</b><span>gold now</span></div>
+      <div class="stat"><b>${c.due}</b><span>need review</span></div>
+    </div>
+    ${LEGEND}
+  </section>
+  <section class="card">
+    <div class="row spread"><h3>Needs review</h3><span class="muted small">${due.length ? 'Most urgent first' : ''}</span></div>
+    ${due.length ? `<ul class="due-list">${shown.map(d => `
+      <li>
+        <span class="sdot" style="background:${d.s.color}"></span>
+        <span class="leaf-wrap" data-open="${d.tw.id}" style="cursor:pointer">${leafIcon(d.e)}</span>
+        <span class="name" data-open="${d.tw.id}" style="cursor:pointer"><b>${esc(d.tw.name)}</b><span>${esc(d.s.name)} · ${esc(d.b.name)}</span></span>
+        <button class="btn sm" data-study="${d.tw.id}">${d.e.stage === 'brown' ? 'Gold it' : 'Review'}</button>
+      </li>`).join('')}</ul>
+      ${due.length > 8 ? `<button class="btn ghost sm" data-action="toggle-due" style="margin-top:8px">${showAllDue ? 'Show less' : 'Show all ' + due.length}</button>` : ''}`
+    : `<div class="empty">Nothing due. Grow some new leaves 🌱</div>`}
+  </section>
+  <section>
+    <div class="forest">${SUBJECTS.map(s => {
+      const x = subjectStats(s);
+      return `<a class="subj-card" href="#/s/${s.id}" style="--sc:${s.color}">
+        <div class="mini">${treeSVG(s, true)}</div>
+        <h3>${esc(s.name)} <span class="muted small">${s.level}</span></h3>
+        ${barHTML(x)}
+        <div class="meta">${x.grown}/${x.total} grown${x.due ? ` · <b style="color:var(--orange)">${x.due} due</b>` : ''}${x.gold ? ` · ${x.gold} gold` : ''}</div>
+      </a>`;
+    }).join('')}</div>
+  </section>`;
+}
+
+function renderSubject(id){
+  const s = SUBJECTS.find(x => x.id === id);
+  if(!s){ location.hash = '#/'; return; }
+  const c = subjectStats(s);
+  const hasOpt = s.branches.some(b => b.opt);
+  app.innerHTML = previewBanner() + `
+  <a class="back" href="#/">‹ Forest</a>
+  <div class="row spread wrap" style="--sc:${s.color}">
+    <h2 style="margin:0">${esc(s.name)} <span class="muted" style="font-size:15px">${s.level}</span></h2>
+    <span class="muted small">${c.grown}/${c.total} grown · ${c.due} due · ${c.gold} gold</span>
+  </div>
+  ${barHTML(c)}
+  ${LEGEND}
+  <div class="tree-wrap" style="--sc:${s.color};margin-top:12px">
+    ${treeSVG(s, false)}
+    <div class="hint">Tap a leaf or bud to log a study session</div>
+  </div>
+  ${hasOpt ? `<p class="muted small" style="margin:0 0 10px">Options you don't study can be hidden in <a href="#/settings">Settings</a>.</p>` : ''}
+  <div>${visibleBranches(s).map(b => {
+    const es = b.twigs.map(tw => eff(tw.id));
+    const grown = es.filter(e => e.stage !== 'bare').length;
+    return `<details class="branch" data-key="${b.key}"${openBranches.has(b.key) ? ' open' : ''}>
+      <summary>
+        <span class="bt"><b>${esc(b.name)}</b>
+          <span class="dots">${es.map(e => `<i class="d ${e.stage === 'bare' ? '' : e.stage}${e.outline ? ' ol' : ''}"></i>`).join('')}</span>
+        </span>
+        <span class="muted small">${grown}/${b.twigs.length}</span>
+        <span class="chev">›</span>
+      </summary>
+      <ul class="twigs">${b.twigs.map((tw, i) => {
+        const e = es[i];
+        return `<li data-open="${tw.id}">
+          ${leafIcon(e)}
+          <span class="tn"><b>${esc(tw.name)}${tierChip(e.t)}</b><span>${esc(statusText(e))}</span></span>
+          <button class="btn sm ${isDue(e) || e.stage === 'bare' ? '' : 'secondary'}" data-study="${tw.id}"${e.stage === 'gold' ? ' disabled' : ''}>${e.stage === 'bare' ? 'Studied' : e.stage === 'brown' ? 'Gold it' : e.stage === 'gold' ? '✨' : 'Review'}</button>
+        </li>`;
+      }).join('')}</ul>
+    </details>`;
+  }).join('')}</div>`;
+}
+
+function renderSettings(){
+  const cfg = getSupaConfig();
+  const last = Number(lsGet(LS_LAST) || 0);
+  const optSubjects = SUBJECTS.filter(s => s.branches.some(b => b.opt));
+  app.innerHTML = previewBanner() + `
+  <a class="back" href="#/">‹ Forest</a>
+  <h2>Settings</h2>
+
+  <section class="card">
+    <h3>Sync between devices</h3>
+    <p class="muted small" style="margin:0 0 8px">No login. Everything is stored under this private sync ID. Enter the same ID on your phone and PC to share progress. Keep it secret, since anyone with it can see and change your progress.</p>
+    <span class="field"><span>Your sync ID</span><code class="mono" id="syncIdBox">${esc(syncId)}</code></span>
+    <div class="row wrap">
+      <button class="btn sm secondary" data-action="copy-id">Copy ID</button>
+      <button class="btn sm secondary" data-action="sync">Sync now</button>
+    </div>
+    <p class="small muted" style="margin:8px 0 0">Status: <b id="syncStatusLine">${esc(syncLabel())}</b>${last ? ` · last synced ${esc(fmtDate(last))}` : ''}</p>
+    <label class="field"><span>Use an ID from another device</span><input type="text" id="newSyncId" placeholder="Paste sync ID" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <button class="btn sm" data-action="switch-id">Use this ID</button>
+  </section>
+
+  <section class="card">
+    <h3>Supabase connection</h3>
+    <p class="muted small" style="margin:0 0 4px">Already set in the file? Leave these blank. Otherwise paste them from your Supabase project (see SETUP.md).</p>
+    <label class="field"><span>Project URL</span><input type="text" id="supaUrl" value="${esc(cfg.urlOverride)}" placeholder="${esc(CONFIG.SUPABASE_URL || 'https://xxxx.supabase.co')}" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label class="field"><span>Anon / publishable key</span><input type="password" id="supaKey" value="${esc(cfg.keyOverride)}" placeholder="${CONFIG.SUPABASE_ANON_KEY ? 'Using key from file' : 'eyJ… or sb_publishable_…'}" autocomplete="off"></label>
+    <button class="btn sm" data-action="save-supa">Save & connect</button>
+  </section>
+
+  ${optSubjects.map(s => `
+  <section class="card">
+    <h3>${esc(s.name)} options</h3>
+    <p class="muted small" style="margin:0 0 6px">Turn off the ones you don't study.</p>
+    ${s.branches.filter(b => b.opt).map(b => `
+      <label class="toggle-row"><span>${esc(b.name.replace(/^(Option|Elective \d): /,''))} <span class="muted small">${b.name.startsWith('Elective') ? 'Elective' : 'Option'}</span></span>
+        <span class="switch"><input type="checkbox" data-hide="${b.key}"${state.settings.hidden[b.key] ? '' : ' checked'}><i></i></span>
+      </label>`).join('')}
+  </section>`).join('')}
+
+  <section class="card">
+    <h3>Preview leaf colours</h3>
+    <p class="muted small" style="margin:0 0 6px">Fast-forward time to see how your leaves will look. This only changes the view, not your data.</p>
+    <input type="range" min="0" max="120" step="1" value="${previewDays}" id="previewRange" aria-label="Preview days ahead">
+    <div class="small muted" id="previewLabel">${previewDays ? '+' + previewDays + ' days' : 'Today'}</div>
+  </section>
+
+  <section class="card">
+    <h3>Backup</h3>
+    <div class="row wrap">
+      <button class="btn sm secondary" data-action="export">Export JSON</button>
+      <label class="btn sm secondary" style="display:inline-block">Import JSON<input type="file" accept="application/json,.json" id="importFile" hidden></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>Danger zone</h3>
+    <button class="btn sm danger" data-action="reset-all">Reset all progress</button>
+  </section>
+  <p class="muted small" style="text-align:center">Leaf cycle: green → 24h orange → 2 weeks red → 4 weeks brown → study for gold → 2 months later back to green.</p>`;
+
+  document.getElementById('previewRange').addEventListener('input', ev => {
+    previewDays = Number(ev.target.value);
+    document.getElementById('previewLabel').textContent = previewDays ? '+' + previewDays + ' days' : 'Today';
+    const old = app.querySelector('.preview-banner');
+    if(old) old.remove();
+    if(previewDays) app.insertAdjacentHTML('afterbegin', previewBanner());
+  });
+  document.getElementById('importFile').addEventListener('change', importJSON);
+}
+
+function currentRoute(){ return location.hash || '#/'; }
+function render(){
+  const h = currentRoute();
+  if(h.startsWith('#/s/')) renderSubject(decodeURIComponent(h.slice(4)));
+  else if(h === '#/settings') renderSettings();
+  else renderHome();
+}
+
+/* ---------------- sheet ---------------- */
+let sheetId = null;
+const sheetWrap = document.getElementById('sheetWrap'), sheetBody = document.getElementById('sheetBody');
+function openSheet(id){ if(!TWIG_INDEX[id]) return; sheetId = id; refreshSheet(); sheetWrap.hidden = false; }
+function closeSheet(){ sheetId = null; sheetWrap.hidden = true; }
+function refreshSheet(){
+  if(!sheetId) return;
+  const { subj, branch, twig } = TWIG_INDEX[sheetId];
+  const e = eff(sheetId);
+  const rec = state.twigs[sheetId];
+  sheetBody.innerHTML = `
+    <div class="crumb">${esc(subj.name)} › ${esc(branch.name)}</div>
+    <h3>${esc(twig.name)}${tierChip(e.t)}</h3>
+    <div class="big-leaf">${bigLeaf(e)}</div>
+    <div style="text-align:center;margin-bottom:6px"><span class="status-chip">${esc(STAGE_NAME[e.stage])}${e.outline ? ' · reviewed' : ''}</span></div>
+    <p class="muted small" style="text-align:center;margin:4px 0 10px">${esc(statusText(e))}</p>
+    <dl class="kv">
+      ${e.stage !== 'bare' ? `<dt>Cycle started</dt><dd>${esc(fmtDate(e.s))}</dd>` : ''}
+      ${e.stage !== 'bare' ? `<dt>Reviews this cycle</dt><dd>${(e.r || []).length}</dd>` : ''}
+      ${e.stage === 'gold' ? `<dt>Turned gold</dt><dd>${esc(fmtDate(e.g))}</dd>` : ''}
+      <dt>Gold tiers earned</dt><dd>${e.t ? roman(e.t) + ' (' + e.t + ')' : 'None yet'}</dd>
+    </dl>
+    <div class="actions">
+      <button class="btn" data-study="${sheetId}"${e.stage === 'gold' || previewDays ? ' disabled' : ''}>${esc(studyLabel(e))}</button>
+      ${rec && rec.s ? `<button class="btn danger" data-action="reset-twig">Reset</button>` : ''}
+      <button class="btn ghost" data-action="close-sheet">Close</button>
+    </div>`;
+}
+
+/* ---------------- toast ---------------- */
+let toastTimer = null, toastUndo = null;
+const toastEl = document.getElementById('toast');
+function toast(msg, undo){
+  toastUndo = undo || null;
+  toastEl.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button data-action="undo">Undo</button>' : ''}`;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.classList.remove('show'); toastUndo = null; }, undo ? 5000 : 2600);
+}
+
+/* ---------------- theme ---------------- */
+function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); const m = document.querySelector('meta[name=theme-color]'); if(m) m.content = t === 'dark' ? '#0f1410' : '#1f3a24'; }
+let theme = lsGet(LS_THEME) || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+applyTheme(theme);
+
+/* ---------------- sync (Supabase) ---------------- */
+function genId(){
+  const a = new Uint8Array(24);
+  (window.crypto || window.msCrypto).getRandomValues(a);
+  return Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+}
+let syncId = lsGet(LS_SYNC);
+if(!syncId || syncId.length < 32){ syncId = genId(); lsSet(LS_SYNC, syncId); }
+
+function getSupaConfig(){
+  let o = {};
+  try { o = JSON.parse(lsGet(LS_SUPA) || '{}') || {}; } catch(e){}
+  return {
+    url: (o.url || CONFIG.SUPABASE_URL || '').trim(),
+    key: (o.key || CONFIG.SUPABASE_ANON_KEY || '').trim(),
+    urlOverride: o.url || '', keyOverride: o.key || ''
+  };
+}
+let sb = null, syncState = 'off', syncing = false, syncAgain = false, pushTimer = null, syncErr = '';
+function setSync(s, err){
+  syncState = s; syncErr = err || '';
+  const pill = document.getElementById('syncPill');
+  pill.dataset.s = s;
+  document.getElementById('syncText').textContent = { off:'Sync off', ok:'Synced', syncing:'Syncing…', offline:'Offline', error:'Sync error' }[s];
+  pill.title = s === 'error' ? 'Sync error: ' + syncErr : 'Sync now';
+  const line = document.getElementById('syncStatusLine');
+  if(line) line.textContent = syncLabel();
+}
+function syncLabel(){
+  return { off:'Not connected. Add your Supabase details below.', ok:'Synced', syncing:'Syncing…', offline:'Offline. Changes are saved on this device and will sync later.', error:'Error: ' + syncErr }[syncState];
+}
+let sbLoading = false;
+function loadSupabaseLib(cb){
+  if(window.supabase){ cb(); return; }
+  if(sbLoading) return;
+  sbLoading = true;
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  s.onload = () => { sbLoading = false; cb(); };
+  s.onerror = () => { sbLoading = false; s.remove(); setSync(navigator.onLine ? 'error' : 'offline', 'Could not load the sync library'); };
+  document.head.appendChild(s);
+}
+function initSupabase(){
+  const c = getSupaConfig();
+  if(!c.url || !c.key){ sb = null; setSync('off'); return; }
+  loadSupabaseLib(() => {
+    try {
+      sb = window.supabase.createClient(c.url, c.key, { auth:{ persistSession:false, autoRefreshToken:false, detectSessionInUrl:false } });
+      syncNow();
+    } catch(e){ sb = null; setSync('error', e.message); }
+  });
+}
+function stable(v){
+  if(Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if(v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  return JSON.stringify(v === undefined ? null : v);
+}
+function mergeStates(a, b){
+  const out = blankState();
+  const ta = (a && a.twigs) || {}, tb = (b && b.twigs) || {};
+  new Set([...Object.keys(ta), ...Object.keys(tb)]).forEach(k => {
+    const x = ta[k], y = tb[k];
+    out.twigs[k] = !x ? y : !y ? x : ((y.u || 0) > (x.u || 0) ? y : x);
+  });
+  const sa = (a && a.settings) || { hidden:{}, u:0 }, sb_ = (b && b.settings) || { hidden:{}, u:0 };
+  out.settings = (sb_.u || 0) > (sa.u || 0) ? sb_ : sa;
+  out.settings.hidden = out.settings.hidden || {};
+  return out;
+}
+async function syncNow(){
+  if(!sb){ setSync('off'); return; }
+  if(!navigator.onLine){ setSync('offline'); return; }
+  if(syncing){ syncAgain = true; return; }
+  syncing = true; setSync('syncing');
+  try {
+    const { data: remote, error } = await sb.rpc('forest_get', { p_sync_id: syncId });
+    if(error) throw error;
+    const merged = remote ? mergeStates(state, remote) : state;
+    const localChanged = stable(merged) !== stable(state);
+    state = merged; saveLocal();
+    if(!remote || stable(merged) !== stable(remote)){
+      const { error: e2 } = await sb.rpc('forest_save', { p_sync_id: syncId, p_data: merged });
+      if(e2) throw e2;
+    }
+    lsSet(LS_LAST, String(Date.now()));
+    setSync('ok');
+    if(localChanged){ if(currentRoute() !== '#/settings') render(); refreshSheet(); }
+  } catch(err){
+    console.error(err);
+    setSync(navigator.onLine ? 'error' : 'offline', (err && err.message) || String(err));
+  } finally {
+    syncing = false;
+    if(syncAgain){ syncAgain = false; syncNow(); }
+  }
+}
+function schedulePush(){ clearTimeout(pushTimer); pushTimer = setTimeout(syncNow, 1500); }
+
+/* ---------------- backup ---------------- */
+function exportJSON(){
+  const blob = new Blob([JSON.stringify({ app:'study-forest', exported: new Date().toISOString(), state }, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'study-forest-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function importJSON(ev){
+  const f = ev.target.files && ev.target.files[0];
+  if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const data = JSON.parse(rd.result);
+      const incoming = data.state || data;
+      if(!incoming || typeof incoming.twigs !== 'object') throw new Error('Not a Study Forest backup');
+      const replace = confirm('Replace your current progress with this backup?\n\nOK = replace\nCancel = merge (keeps whichever is newer for each twig)');
+      const t = Date.now();
+      if(replace){
+        const fresh = blankState();
+        const ids = new Set([...Object.keys(state.twigs), ...Object.keys(incoming.twigs)]);
+        ids.forEach(id => {
+          const r = incoming.twigs[id];
+          fresh.twigs[id] = r ? { ...r, u: t } : { s:null, r:[], g:null, t:0, u:t };
+        });
+        fresh.settings = { hidden: (incoming.settings && incoming.settings.hidden) || {}, u: t };
+        state = fresh;
+      } else {
+        state = mergeStates(state, incoming);
+      }
+      persist(); render(); toast('Backup imported');
+    } catch(e){ alert('Import failed: ' + e.message); }
+    ev.target.value = '';
+  };
+  rd.readAsText(f);
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener('click', ev => {
+  const studyBtn = ev.target.closest('[data-study]');
+  if(studyBtn){ ev.preventDefault(); ev.stopPropagation(); study(studyBtn.dataset.study); return; }
+  const actEl = ev.target.closest('[data-action]');
+  if(actEl){
+    const a = actEl.dataset.action;
+    if(a === 'theme'){ theme = theme === 'dark' ? 'light' : 'dark'; lsSet(LS_THEME, theme); applyTheme(theme); }
+    else if(a === 'sync'){ if(sb) syncNow(); else { initSupabase(); if(!getSupaConfig().url) location.hash = '#/settings'; } }
+    else if(a === 'close-sheet') closeSheet();
+    else if(a === 'reset-twig'){ if(sheetId) resetTwig(sheetId); }
+    else if(a === 'undo'){ if(toastUndo){ const u = toastUndo; toastUndo = null; toastEl.classList.remove('show'); u(); } }
+    else if(a === 'toggle-due'){ showAllDue = !showAllDue; render(); }
+    else if(a === 'end-preview'){ previewDays = 0; render(); refreshSheet(); }
+    else if(a === 'copy-id'){
+      const done = () => toast('Sync ID copied');
+      if(navigator.clipboard) navigator.clipboard.writeText(syncId).then(done, () => prompt('Copy your sync ID:', syncId));
+      else prompt('Copy your sync ID:', syncId);
+    }
+    else if(a === 'switch-id'){
+      const v = (document.getElementById('newSyncId').value || '').trim();
+      if(!/^[A-Za-z0-9_-]{32,128}$/.test(v)){ alert('That doesn\'t look like a valid sync ID (32+ letters/numbers).'); return; }
+      if(v === syncId){ toast('Already using that ID'); return; }
+      if(!confirm('Switch to this sync ID? Progress on this device will be merged into it.')) return;
+      syncId = v; lsSet(LS_SYNC, v); render(); toast('Switched sync ID'); syncNow();
+    }
+    else if(a === 'save-supa'){
+      const url = document.getElementById('supaUrl').value.trim().replace(/\/+$/, '');
+      const key = document.getElementById('supaKey').value.trim();
+      if(url && !/^https:\/\/.+/.test(url)){ alert('The URL should start with https://'); return; }
+      lsSet(LS_SUPA, JSON.stringify({ url, key }));
+      sb = null; initSupabase(); toast('Saved, connecting…');
+    }
+    else if(a === 'export') exportJSON();
+    else if(a === 'reset-all'){
+      if(!confirm('Reset ALL progress on every synced device? This cannot be undone (export a backup first).')) return;
+      const t = Date.now();
+      Object.keys(state.twigs).forEach(id => { state.twigs[id] = { s:null, r:[], g:null, t:0, u:t }; });
+      persist(); render(); toast('All progress reset');
+    }
+    return;
+  }
+  const openEl = ev.target.closest('[data-open]');
+  if(openEl){ openSheet(openEl.dataset.open); }
+});
+document.addEventListener('keydown', ev => {
+  if(ev.key === 'Escape' && sheetId) closeSheet();
+  if((ev.key === 'Enter' || ev.key === ' ') && ev.target.classList && ev.target.classList.contains('hit')){ ev.preventDefault(); openSheet(ev.target.dataset.open); }
+});
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  if(el.dataset && el.dataset.hide){
+    state.settings.hidden = { ...state.settings.hidden, [el.dataset.hide]: !el.checked };
+    state.settings.u = Date.now();
+    persist();
+  }
+});
+document.addEventListener('toggle', ev => {
+  const d = ev.target;
+  if(d.matches && d.matches('details.branch')){ if(d.open) openBranches.add(d.dataset.key); else openBranches.delete(d.dataset.key); }
+}, true);
+window.addEventListener('hashchange', () => { closeSheet(); render(); window.scrollTo(0, 0); });
+window.addEventListener('online', () => { if(sb) syncNow(); else initSupabase(); });
+window.addEventListener('offline', () => setSync(sb ? 'offline' : 'off'));
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible'){ if(currentRoute() !== '#/settings') render(); refreshSheet(); if(sb) syncNow(); } });
+window.addEventListener('storage', ev => { if(ev.key === LS_STATE){ state = loadLocal(); render(); refreshSheet(); } });
+setInterval(() => { if(document.visibilityState !== 'visible') return; if(currentRoute() !== '#/settings') render(); refreshSheet(); }, 60000);
+setInterval(() => { if(document.visibilityState === 'visible' && sb) syncNow(); }, 90000);
+
+/* ---------------- start ---------------- */
+render();
+initSupabase();
+</script>
+</body>
+</html>
